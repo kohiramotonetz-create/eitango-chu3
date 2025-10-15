@@ -261,86 +261,83 @@ const [sent, setSent] = useState(false);
     }
   }
 
-  // ---- 画面描画 ----
-  if (step === "start") {
-    return (
-      <div style={wrapStyle}>
-        <h1 style={{ fontSize: 28, marginBottom: 8 }}>eitango-chu3</h1>
-        <p style={{ opacity: 0.8, marginBottom: 16 }}>スタート画面</p>
+// ---- 画面描画 ----
+let content = null;
 
-        <label style={labelStyle}>あなたの名前</label>
-        <input
-          style={inputStyle}
-          placeholder="例：hira-chan"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-        />
+if (step === "start") {
+  content = (
+    <div style={wrapStyle}>
+      <h1 style={{ fontSize: 28, marginBottom: 8 }}>eitango-chu3</h1>
+      <p style={{ opacity: 0.8, marginBottom: 16 }}>スタート画面</p>
 
-        <label style={labelStyle}>出題形式</label>
-        <select
-          style={selectStyle}
-          value={mode}
-          onChange={(e) => setMode(e.target.value)}
-        >
-          {MODE_CHOICES.map((x) => (
-            <option key={x} value={x}>{x}</option>
-          ))}
-        </select>
-
-        <label style={labelStyle}>難易度</label>
-        <select
-          style={selectStyle}
-          value={diffChoice}
-          onChange={(e) => setDiffChoice(e.target.value)}
-        >
-          {DIFF_CHOICES.map((x) => (
-            <option key={x} value={x}>{x}</option>
-          ))}
-        </select>
-
-        <div style={{ fontSize: 12, marginTop: 8, opacity: 0.8 }}>
-          利用可能な単語数：{filteredPool.length} / {allItems.length}
-        </div>
-
-        <button
-          style={primaryBtnStyle}
-          onClick={startQuiz}
-          disabled={!canStart}
-        >
-          開始（{QUESTION_COUNT}問）
-        </button>
-      </div>
-    );
-  }
-
-  else if (step === "quiz") {
-    const it = items[qIndex];
-    const isJpToEn = mode === "日本語→英単語";
-    return (
-      <QuizFrame
-        index={qIndex}
-        total={items.length}
-        isJpToEn={isJpToEn}
-        display={isJpToEn ? it.jp : it.en}
-        totalLeft={USE_TOTAL_TIMER ? totalLeft : null}
-        perLeft={perLeft}
-        value={value}
-        setValue={setValue}
-        onSubmit={() => submitAnswer(value)}
-        showReview={showReview}
-        onCloseReview={() => { setShowReview({ visible: false, record: null }); nextQuestion(); }}
+      <label style={labelStyle}>あなたの名前</label>
+      <input
+        style={inputStyle}
+        placeholder="例：hira-chan"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
       />
-    );
-  }
 
-- else if (step === "result") {
+      <label style={labelStyle}>出題形式</label>
+      <select
+        style={selectStyle}
+        value={mode}
+        onChange={(e) => setMode(e.target.value)}
+      >
+        {MODE_CHOICES.map((x) => (
+          <option key={x} value={x}>{x}</option>
+        ))}
+      </select>
+
+      <label style={labelStyle}>難易度</label>
+      <select
+        style={selectStyle}
+        value={diffChoice}
+        onChange={(e) => setDiffChoice(e.target.value)}
+      >
+        {DIFF_CHOICES.map((x) => (
+          <option key={x} value={x}>{x}</option>
+        ))}
+      </select>
+
+      <div style={{ fontSize: 12, marginTop: 8, opacity: 0.8 }}>
+        利用可能な単語数：{filteredPool.length} / {allItems.length}
+      </div>
+
+      <button
+        style={primaryBtnStyle}
+        onClick={startQuiz}
+        disabled={!canStart}
+      >
+        開始（{QUESTION_COUNT}問）
+      </button>
+    </div>
+  );
+} else if (step === "quiz") {
+  const it = items[qIndex];
+  const isJpToEn = mode === "日本語→英単語";
+  content = (
+    <QuizFrame
+      index={qIndex}
+      total={items.length}
+      isJpToEn={isJpToEn}
+      display={isJpToEn ? it.jp : it.en}
+      totalLeft={USE_TOTAL_TIMER ? totalLeft : null}
+      perLeft={perLeft}
+      value={value}
+      setValue={setValue}
+      onSubmit={() => submitAnswer(value)}
+      showReview={showReview}
+      onCloseReview={() => { setShowReview({ visible: false, record: null }); nextQuestion(); }}
+    />
+  );
+} else if (step === "result") {
   const score = answers.filter((a) => a.ok).length;
 
   async function handleSend() {
     setSending(true);
     setProgress(0);
 
-    // 進捗バーのフェイク演出（0→100%）
     const fake = setInterval(() => {
       setProgress((p) => {
         if (p >= 100) {
@@ -353,7 +350,6 @@ const [sent, setSent] = useState(false);
       });
     }, 200);
 
-    // 実際の送信（GASへPOST）
     await sendResult();
   }
 
@@ -370,7 +366,7 @@ const [sent, setSent] = useState(false);
     setStep("quiz");
   };
 
-  return (
+  content = (
     <div style={wrapStyle}>
       <h2 style={{ fontSize: 24, marginBottom: 8 }}>結果</h2>
       <div style={{ marginBottom: 8 }}>
@@ -380,7 +376,6 @@ const [sent, setSent] = useState(false);
         得点：{score} / {answers.length}
       </div>
 
-      {/* 結果一覧ボックス（中央寄せ＋背景統一） */}
       <div
         style={{
           maxHeight: 300,
@@ -413,7 +408,6 @@ const [sent, setSent] = useState(false);
         ))}
       </div>
 
-      {/* 送信ボタン・進捗・完了表示 */}
       {!sent && !sending && (
         <button style={primaryBtnStyle} onClick={handleSend}>
           結果を送信
@@ -462,7 +456,9 @@ const [sent, setSent] = useState(false);
     </div>
   );
 }
-return null;
+
+return content;
+
 
 
 
