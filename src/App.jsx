@@ -235,30 +235,46 @@ const [sent, setSent] = useState(false);
   const [showReview, setShowReview] = useState({ visible: false, record: null });
 
   async function sendResult() {
-    try {
-      const url = import.meta.env.VITE_GAS_URL;
-      if (!url) return;
-      const payload = {
-        timestamp: new Date().toISOString(),
-        user_name: name,
-        mode,
-        difficulty: diffChoice,
-        score: answers.filter((a) => a.ok).length,
-        duration_sec: USE_TOTAL_TIMER ? (TOTAL_TIME_SEC_DEFAULT - totalLeft) : null,
-        question_set_id: `auto-${Date.now()}`,
-        questions: items.map((it) => ({ en: it.en, jp: it.jp, level: it.level })),
-        answers,
-        device_info: navigator.userAgent,
-      };
-      await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-    } catch (e) {
-      console.warn("Send failed", e);
-    }
+  const url = import.meta.env.VITE_GAS_URL;
+  if (!url) {
+    console.warn("VITE_GAS_URL が未設定です");
+    throw new Error("VITE_GAS_URL is empty");
   }
+
+  const payload = {
+    timestamp: new Date().toISOString(),
+    user_name: name,
+    mode,
+    difficulty: diffChoice,
+    score: answers.filter((a) => a.ok).length,
+    duration_sec: USE_TOTAL_TIMER ? (TOTAL_TIME_SEC_DEFAULT - totalLeft) : null,
+    question_set_id: `auto-${Date.now()}`,
+    questions: items.map((it) => ({ en: it.en, jp: it.jp, level: it.level })),
+    answers,
+    device_info: navigator.userAgent,
+  };
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    // CORSはApps ScriptのWeb Appなら基本OK。必要なら次行を有効化:
+    // mode: "no-cors",
+    body: JSON.stringify(payload),
+    redirect: "follow",
+    keepalive: true, // タブ遷移時も投げ切る保険
+  });
+
+  // no-cors でない限り、ステータス確認
+  try {
+    const text = await res.text();
+    console.log("GAS response:", res.status, text);
+  } catch {}
+
+  if (!res.ok && res.type !== "opaque") {
+    throw new Error("GAS POST failed: " + res.status);
+  }
+}
+
 
 // ---- 画面描画 ----
 let content = null;
@@ -349,7 +365,12 @@ if (step === "start") {
       });
     }, 200);
 
+    try {
     await sendResult();
+  } catch (e) {
+    console.error(e);
+    alert("送信に失敗しました。VITE_GAS_URL と GAS の公開設定を確認してください。");
+  }
   }
 
   const wrongOnly = answers.filter((a) => !a.ok);
