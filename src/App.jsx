@@ -328,59 +328,133 @@ export default function App() {
     );
   }
 
-  if (step === "result") {
-    const score = answers.filter((a) => a.ok).length;
-    return (
-      <div style={wrapStyle}>
-        <h2 style={{ fontSize: 24, marginBottom: 8 }}>結果</h2>
-        <div style={{ marginBottom: 8 }}>
-          名前：<b>{name}</b> ／ 形式：{mode} ／ 難易度：{diffChoice}
-        </div>
-        <div style={{ fontSize: 20, marginBottom: 16 }}>
-          得点：{score} / {answers.length}
-        </div>
-
-        <div
-          style={{
-            maxHeight: 300,
-            overflow: "auto",
-            width: "100%",
-            border: "1px solid #eee",
-            borderRadius: 12,
-            padding: 12,
-          }}
-        >
-          {answers.map((r, i) => (
-            <div
-              key={i}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr 1fr",
-                gap: 8,
-                padding: "6px 0",
-                borderBottom: "1px solid #f0f0f0",
-              }}
-            >
-              <div>問題：{r.q}</div>
-              <div>あなた：{r.a || "（無回答）"}</div>
-              <div>
-                模範解答：<b>{r.correct}</b> {r.ok ? "✅" : "❌"}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <button
-          style={primaryBtnStyle}
-          onClick={() => { setStep("start"); setName(name); }}
-        >
-          もう一度
-        </button>
-      </div>
-    );
-  }
-
-  return null;
+if (step === "result") {
+-   const score = answers.filter((a) => a.ok).length;
+-   return (
+-     <div style={wrapStyle}>
+-       ...（今の結果表示UI）
+-     </div>
+-   );
++   // 🟨【ここから新しいコードに差し替え】🟨
++   const score = answers.filter((a) => a.ok).length;
++   const [sending, setSending] = useState(false);
++   const [progress, setProgress] = useState(0);
++   const [sent, setSent] = useState(false);
++
++   async function handleSend() {
++     setSending(true);
++     setProgress(0);
++     const fake = setInterval(() => {
++       setProgress((p) => {
++         if (p >= 100) {
++           clearInterval(fake);
++           setSent(true);
++           setSending(false);
++           return 100;
++         }
++         return p + 10;
++       });
++     }, 200);
++     await sendResult();
++   }
++
++   const wrongOnly = answers.filter((a) => !a.ok);
++   const handleRetryWrong = () => {
++     const wrongItems = items.filter((_, i) => !answers[i].ok);
++     setItems(sampleUnique(wrongItems, Math.min(QUESTION_COUNT, wrongItems.length)));
++     setAnswers([]);
++     setQIndex(0);
++     setStep("quiz");
++   };
++
++   return (
++     <div style={wrapStyle}>
++       <h2 style={{ fontSize: 24, marginBottom: 8 }}>結果</h2>
++       <div style={{ marginBottom: 8 }}>
++         名前：<b>{name}</b> ／ 形式：{mode} ／ 難易度：{diffChoice}
++       </div>
++       <div style={{ fontSize: 20, marginBottom: 16 }}>
++         得点：{score} / {answers.length}
++       </div>
++
++       {/* 🟦結果一覧ボックス（中央寄せ＋背景統一）🟦 */}
++       <div
++         style={{
++           maxHeight: 300,
++           overflow: "auto",
++           width: "100%",
++           border: "1px solid #ddd",
++           borderRadius: 12,
++           padding: 12,
++           background: "#fafafa",
++           textAlign: "left",
++         }}
++       >
++         {answers.map((r, i) => (
++           <div
++             key={i}
++             style={{
++               display: "grid",
++               gridTemplateColumns: "1fr 1fr 1fr",
++               gap: 8,
++               padding: "6px 0",
++               borderBottom: "1px solid #f0f0f0",
++             }}
++           >
++             <div>問題：{r.q}</div>
++             <div>あなた：{r.a || "（無回答）"}</div>
++             <div>
++               模範解答：<b>{r.correct}</b> {r.ok ? "✅" : "❌"}
++             </div>
++           </div>
++         ))}
++       </div>
++
++       {/* 🟩送信ボタン・進捗バー・完了表示🟩 */}
++       {!sent && !sending && (
++         <button style={primaryBtnStyle} onClick={handleSend}>
++           結果を送信
++         </button>
++       )}
++
++       {sending && (
++         <div style={{ marginTop: 12, width: "80%" }}>
++           <div style={{
++             height: 10,
++             background: "#eee",
++             borderRadius: 5,
++             overflow: "hidden",
++             marginBottom: 6,
++           }}>
++             <div style={{
++               width: `${progress}%`,
++               height: "100%",
++               background: "#111",
++               transition: "width 0.2s linear",
++             }}/>
++           </div>
++           <div>{progress}% 送信中...</div>
++         </div>
++       )}
++
++       {sent && (
++         <>
++           <div style={{ marginTop: 16, fontWeight: "bold" }}>✅ 送信完了！</div>
++           <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
++             <button style={primaryBtnStyle} onClick={() => setStep("start")}>
++               ホームへ戻る
++             </button>
++             {wrongOnly.length > 0 && (
++               <button style={primaryBtnStyle} onClick={handleRetryWrong}>
++                 間違えた問題を復習
++               </button>
++             )}
++           </div>
++         </>
++       )}
++     </div>
++   );
++   // 🟨【ここまで差し替え】🟨
 }
 
 // ========= 小さめのUI部品 =========
@@ -462,11 +536,21 @@ const wrapStyle = {
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
+  justifyContent: "center", // ← 追加
+  textAlign: "center",      // ← 追加
   gap: 12,
 };
 const labelStyle = { alignSelf: "flex-start", fontSize: 14, marginTop: 8 };
 const inputStyle = { width: "100%", padding: "12px 14px", fontSize: 16, border: "1px solid #ddd", borderRadius: 12 };
 const selectStyle = { ...inputStyle };
 const primaryBtnStyle = { marginTop: 12, padding: "12px 18px", borderRadius: 12, border: "none", background: "#111", color: "#fff", fontSize: 16, cursor: "pointer" };
-const questionBoxStyle = { width: "100%", background: "#fafafa", border: "1px solid #eee", borderRadius: 16, padding: 14 };
+const questionBoxStyle = {
+  width: "100%",
+  background: "#f7f7f7", // ← 柔らかいグレー
+  border: "1px solid #ddd", // ← 他要素と統一
+  borderRadius: 16,
+  padding: 14,
+  boxShadow: "0 2px 6px rgba(0,0,0,.05)", // ← 少しだけ影を足して立体感
+};
+
 const reviewStyle = { width: "100%", background: "#fff", border: "1px solid #eee", borderRadius: 16, padding: 14, marginTop: 12, boxShadow: "0 2px 10px rgba(0,0,0,.04)" };
