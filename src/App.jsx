@@ -313,7 +313,7 @@ const [sent, setSent] = useState(false);
     );
   }
 
-  if (step === "quiz") {
+  else if (step === "quiz") {
     const it = items[qIndex];
     const isJpToEn = mode === "日本語→英単語";
     return (
@@ -333,7 +333,7 @@ const [sent, setSent] = useState(false);
     );
   }
 
--  if (step === "result") {
+- else if (step === "result") {
   const score = answers.filter((a) => a.ok).length;
 
   async function handleSend() {
@@ -462,6 +462,8 @@ const [sent, setSent] = useState(false);
     </div>
   );
 }
+return null;
+
 
 
 // ========= 小さめのUI部品 =========
