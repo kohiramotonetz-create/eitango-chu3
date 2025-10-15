@@ -262,7 +262,7 @@ async function sendResult() {
   });
 }
 
-}
+
 
 
   const payload = {
