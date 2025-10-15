@@ -96,6 +96,11 @@ function sampleUnique(arr, k) {
 
 // ========= メインコンポーネント =========
 export default function App() {
+  // 送信UI用の状態（結果画面で使うが、宣言はトップで）
+const [sending, setSending] = useState(false);
+const [progress, setProgress] = useState(0);
+const [sent, setSent] = useState(false);
+
   // グローバルな state（※Hookは常にコンポーネント直下で宣言：条件分岐内に置かない）
   const [name, setName] = useState("");
   const [mode, setMode] = useState(MODE_CHOICES[0]);
@@ -328,134 +333,137 @@ export default function App() {
     );
   }
 
-if (step === "result") {
--   const score = answers.filter((a) => a.ok).length;
--   return (
--     <div style={wrapStyle}>
--       ...（今の結果表示UI）
--     </div>
--   );
-+   // 🟨【ここから新しいコードに差し替え】🟨
-+   const score = answers.filter((a) => a.ok).length;
-+   const [sending, setSending] = useState(false);
-+   const [progress, setProgress] = useState(0);
-+   const [sent, setSent] = useState(false);
-+
-+   async function handleSend() {
-+     setSending(true);
-+     setProgress(0);
-+     const fake = setInterval(() => {
-+       setProgress((p) => {
-+         if (p >= 100) {
-+           clearInterval(fake);
-+           setSent(true);
-+           setSending(false);
-+           return 100;
-+         }
-+         return p + 10;
-+       });
-+     }, 200);
-+     await sendResult();
-+   }
-+
-+   const wrongOnly = answers.filter((a) => !a.ok);
-+   const handleRetryWrong = () => {
-+     const wrongItems = items.filter((_, i) => !answers[i].ok);
-+     setItems(sampleUnique(wrongItems, Math.min(QUESTION_COUNT, wrongItems.length)));
-+     setAnswers([]);
-+     setQIndex(0);
-+     setStep("quiz");
-+   };
-+
-+   return (
-+     <div style={wrapStyle}>
-+       <h2 style={{ fontSize: 24, marginBottom: 8 }}>結果</h2>
-+       <div style={{ marginBottom: 8 }}>
-+         名前：<b>{name}</b> ／ 形式：{mode} ／ 難易度：{diffChoice}
-+       </div>
-+       <div style={{ fontSize: 20, marginBottom: 16 }}>
-+         得点：{score} / {answers.length}
-+       </div>
-+
-+       {/* 🟦結果一覧ボックス（中央寄せ＋背景統一）🟦 */}
-+       <div
-+         style={{
-+           maxHeight: 300,
-+           overflow: "auto",
-+           width: "100%",
-+           border: "1px solid #ddd",
-+           borderRadius: 12,
-+           padding: 12,
-+           background: "#fafafa",
-+           textAlign: "left",
-+         }}
-+       >
-+         {answers.map((r, i) => (
-+           <div
-+             key={i}
-+             style={{
-+               display: "grid",
-+               gridTemplateColumns: "1fr 1fr 1fr",
-+               gap: 8,
-+               padding: "6px 0",
-+               borderBottom: "1px solid #f0f0f0",
-+             }}
-+           >
-+             <div>問題：{r.q}</div>
-+             <div>あなた：{r.a || "（無回答）"}</div>
-+             <div>
-+               模範解答：<b>{r.correct}</b> {r.ok ? "✅" : "❌"}
-+             </div>
-+           </div>
-+         ))}
-+       </div>
-+
-+       {/* 🟩送信ボタン・進捗バー・完了表示🟩 */}
-+       {!sent && !sending && (
-+         <button style={primaryBtnStyle} onClick={handleSend}>
-+           結果を送信
-+         </button>
-+       )}
-+
-+       {sending && (
-+         <div style={{ marginTop: 12, width: "80%" }}>
-+           <div style={{
-+             height: 10,
-+             background: "#eee",
-+             borderRadius: 5,
-+             overflow: "hidden",
-+             marginBottom: 6,
-+           }}>
-+             <div style={{
-+               width: `${progress}%`,
-+               height: "100%",
-+               background: "#111",
-+               transition: "width 0.2s linear",
-+             }}/>
-+           </div>
-+           <div>{progress}% 送信中...</div>
-+         </div>
-+       )}
-+
-+       {sent && (
-+         <>
-+           <div style={{ marginTop: 16, fontWeight: "bold" }}>✅ 送信完了！</div>
-+           <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
-+             <button style={primaryBtnStyle} onClick={() => setStep("start")}>
-+               ホームへ戻る
-+             </button>
-+             {wrongOnly.length > 0 && (
-+               <button style={primaryBtnStyle} onClick={handleRetryWrong}>
-+                 間違えた問題を復習
-+               </button>
-+             )}
-+           </div>
-+         </>
-+       )}
-+     </div>
-+   );
-+   // 🟨【ここまで差し替え】🟨
+ {
+-  if (step === "result") {
+  const score = answers.filter((a) => a.ok).length;
+
+  async function handleSend() {
+    setSending(true);
+    setProgress(0);
+
+    // 進捗バーのフェイク演出（0→100%）
+    const fake = setInterval(() => {
+      setProgress((p) => {
+        if (p >= 100) {
+          clearInterval(fake);
+          setSent(true);
+          setSending(false);
+          return 100;
+        }
+        return p + 10;
+      });
+    }, 200);
+
+    // 実際の送信（GASへPOST）
+    await sendResult();
+  }
+
+  const wrongOnly = answers.filter((a) => !a.ok);
+  const handleRetryWrong = () => {
+    const wrongItems = items.filter((_, i) => !answers[i].ok);
+    const next = sampleUnique(
+      wrongItems,
+      Math.min(QUESTION_COUNT, wrongItems.length)
+    );
+    setItems(next);
+    setAnswers([]);
+    setQIndex(0);
+    setStep("quiz");
+  };
+
+  return (
+    <div style={wrapStyle}>
+      <h2 style={{ fontSize: 24, marginBottom: 8 }}>結果</h2>
+      <div style={{ marginBottom: 8 }}>
+        名前：<b>{name}</b> ／ 形式：{mode} ／ 難易度：{diffChoice}
+      </div>
+      <div style={{ fontSize: 20, marginBottom: 16 }}>
+        得点：{score} / {answers.length}
+      </div>
+
+      {/* 結果一覧ボックス（中央寄せ＋背景統一） */}
+      <div
+        style={{
+          maxHeight: 300,
+          overflow: "auto",
+          width: "100%",
+          border: "1px solid #ddd",
+          borderRadius: 12,
+          padding: 12,
+          background: "#fafafa",
+          textAlign: "left",
+        }}
+      >
+        {answers.map((r, i) => (
+          <div
+            key={i}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: 8,
+              padding: "6px 0",
+              borderBottom: "1px solid #f0f0f0",
+            }}
+          >
+            <div>問題：{r.q}</div>
+            <div>あなた：{r.a || "（無回答）"}</div>
+            <div>
+              模範解答：<b>{r.correct}</b> {r.ok ? "✅" : "❌"}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 送信ボタン・進捗・完了表示 */}
+      {!sent && !sending && (
+        <button style={primaryBtnStyle} onClick={handleSend}>
+          結果を送信
+        </button>
+      )}
+
+      {sending && (
+        <div style={{ marginTop: 12, width: "80%" }}>
+          <div
+            style={{
+              height: 10,
+              background: "#eee",
+              borderRadius: 5,
+              overflow: "hidden",
+              marginBottom: 6,
+            }}
+          >
+            <div
+              style={{
+                width: `${progress}%`,
+                height: "100%",
+                background: "#111",
+                transition: "width 0.2s linear",
+              }}
+            />
+          </div>
+          <div>{progress}% 送信中...</div>
+        </div>
+      )}
+
+      {sent && (
+        <>
+          <div style={{ marginTop: 16, fontWeight: "bold" }}>✅ 送信完了！</div>
+          <div style={{ display: "flex", gap: 12, marginTop: 16, justifyContent: "center" }}>
+            <button style={primaryBtnStyle} onClick={() => setStep("start")}>
+              ホームへ戻る
+            </button>
+            {wrongOnly.length > 0 && (
+              <button style={primaryBtnStyle} onClick={handleRetryWrong}>
+                間違えた問題を復習
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
+
 
 // ========= 小さめのUI部品 =========
 function QuizFrame({
