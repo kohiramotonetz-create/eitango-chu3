@@ -544,21 +544,18 @@ const wrapStyle = {
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
-  justifyContent: "center", // ← 追加
-  textAlign: "center",      // ← 追加
+  justifyContent: "center",
+  textAlign: "center",
   gap: 12,
 };
-const labelStyle = { alignSelf: "flex-start", fontSize: 14, marginTop: 8 };
-const inputStyle = { width: "100%", padding: "12px 14px", fontSize: 16, border: "1px solid #ddd", borderRadius: 12 };
-const selectStyle = { ...inputStyle };
-const primaryBtnStyle = { marginTop: 12, padding: "12px 18px", borderRadius: 12, border: "none", background: "#111", color: "#fff", fontSize: 16, cursor: "pointer" };
+
 const questionBoxStyle = {
   width: "100%",
-  background: "#f7f7f7", // ← 柔らかいグレー
-  border: "1px solid #ddd", // ← 他要素と統一
+  background: "#f7f7f7",
+  border: "1px solid #ddd",
   borderRadius: 16,
   padding: 14,
-  boxShadow: "0 2px 6px rgba(0,0,0,.05)", // ← 少しだけ影を足して立体感
+  boxShadow: "0 2px 6px rgba(0,0,0,.05)",
 };
 
 const reviewStyle = { width: "100%", background: "#fff", border: "1px solid #eee", borderRadius: 16, padding: 14, marginTop: 12, boxShadow: "0 2px 10px rgba(0,0,0,.04)" };
