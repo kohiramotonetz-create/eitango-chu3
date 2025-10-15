@@ -234,10 +234,11 @@ const [sent, setSent] = useState(false);
   // レビュー表示（提出直後に「問題/自分の解答/模範解答」を出す）
   const [showReview, setShowReview] = useState({ visible: false, record: null });
 
-// ✅ async をつける
-async function sendResult() {
+
+// await を使わない安全版（ビルドエラー回避）
+function sendResult() {
   const url = import.meta.env.VITE_GAS_URL;
-  if (!url) throw new Error("VITE_GAS_URL is empty");
+  if (!url) return Promise.reject(new Error("VITE_GAS_URL is empty"));
 
   const payload = {
     timestamp: new Date().toISOString(),
@@ -252,15 +253,16 @@ async function sendResult() {
     device_info: navigator.userAgent,
   };
 
-  // ✅ await はこの async 関数内でOK
-  await fetch(url, {
+  // ← ここは await しない。Promise を返すだけ
+  return fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "text/plain;charset=utf-8" }, // ← JSONではなくtext/plainでCORS回避
+    headers: { "Content-Type": "text/plain;charset=utf-8" }, // プリフライト回避
     body: JSON.stringify(payload),
     mode: "no-cors",
     keepalive: true,
   });
 }
+
 
 
 
