@@ -385,6 +385,7 @@ if (step === "start") {
           padding: 12,
           background: "#fafafa",
           textAlign: "left",
+          color: "#111", // ← 結果一覧の文字色も黒に
         }}
       >
         {answers.map((r, i) => (
