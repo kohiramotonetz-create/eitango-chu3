@@ -25,7 +25,6 @@ function parseCsvRaw(csvText) {
   // 簡易CSVパーサ（引用符対応）
   const rows = [];
   let i = 0, field = "", row = [], inQuotes = false;
-
   const pushField = () => { row.push(field); field = ""; };
   const pushRow = () => { rows.push(row); row = []; };
 
@@ -101,7 +100,7 @@ export default function App() {
   const [progress, setProgress] = useState(0);
   const [sent, setSent] = useState(false);
 
-  // グローバルな state（※Hookは常にコンポーネント直下で宣言：条件分岐内に置かない）
+  // グローバル state
   const [name, setName] = useState("");
   const [mode, setMode] = useState(MODE_CHOICES[0]);
   const [diffChoice, setDiffChoice] = useState(DIFF_CHOICES[0]);
@@ -111,7 +110,7 @@ export default function App() {
   const [step, setStep] = useState("start");  // start | quiz | result
   const [qIndex, setQIndex] = useState(0);
 
-  // 入力欄の値（※条件分岐内でuseStateを宣言しない）
+  // 入力欄の値
   const [value, setValue] = useState("");
 
   // timers
@@ -155,7 +154,7 @@ export default function App() {
     if (step === "quiz") setValue("");
   }, [qIndex, step]);
 
-  // コンポーネントのアンマウント時にタイマー停止
+  // アンマウント時にタイマー停止
   useEffect(() => {
     return () => {
       if (totalTimerRef.current) clearInterval(totalTimerRef.current);
@@ -234,7 +233,7 @@ export default function App() {
   // レビュー表示（提出直後に「問題/自分の解答/模範解答」を出す）
   const [showReview, setShowReview] = useState({ visible: false, record: null });
 
-  // await を使わない安全版（ビルドエラー回避）
+  // ---- CORS対策済みの送信関数（awaitを使わない版）----
   function sendResult() {
     const url = import.meta.env.VITE_GAS_URL;
     if (!url) return Promise.reject(new Error("VITE_GAS_URL is empty"));
@@ -252,10 +251,10 @@ export default function App() {
       device_info: navigator.userAgent,
     };
 
-    // ← ここは await しない。Promise を返すだけ
+    // プリフライトを避ける（text/plain + no-cors）
     return fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" }, // プリフライト回避
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload),
       mode: "no-cors",
       keepalive: true,
@@ -339,6 +338,7 @@ export default function App() {
       setSending(true);
       setProgress(0);
 
+      // 0→100% のフェイク進捗（見た目用）
       const fake = setInterval(() => {
         setProgress((p) => {
           if (p >= 100) {
@@ -352,7 +352,7 @@ export default function App() {
       }, 200);
 
       try {
-        await sendResult();
+        await sendResult(); // sendResultはPromiseを返す
       } catch (e) {
         console.error(e);
         alert("送信に失敗しました。VITE_GAS_URL と GAS の公開設定を確認してください。");
@@ -382,6 +382,7 @@ export default function App() {
           得点：{score} / {answers.length}
         </div>
 
+        {/* 結果一覧（中央寄せ・背景統一） */}
         <div
           style={{
             maxHeight: 300,
@@ -392,7 +393,7 @@ export default function App() {
             padding: 12,
             background: "#fafafa",
             textAlign: "left",
-            color: "#111", // ← 結果一覧の文字色も黒に
+            color: "#111",
           }}
         >
           {answers.map((r, i) => (
@@ -415,6 +416,7 @@ export default function App() {
           ))}
         </div>
 
+        {/* 送信ボタン・進捗・完了表示 */}
         {!sent && !sending && (
           <button style={primaryBtnStyle} onClick={handleSend}>
             結果を送信
@@ -448,7 +450,15 @@ export default function App() {
         {sent && (
           <>
             <div style={{ marginTop: 16, fontWeight: "bold" }}>✅ 送信完了！</div>
-            <div style={{ display: "flex", gap: 12, marginTop: 16, justifyContent: "center" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 12,
+                marginTop: 16,
+                justifyContent: "center",
+                flexWrap: "wrap",
+              }}
+            >
               <button style={primaryBtnStyle} onClick={() => setStep("start")}>
                 ホームへ戻る
               </button>
@@ -499,7 +509,7 @@ function QuizFrame({
       </div>
 
       <div style={questionBoxStyle}>
-        <div style={{ opacity: 0.7, fontSize: 12, marginBottom: 6 }}>問題</div>
+        <div style={{ opacity: 0.7, fontSize: 12, marginBottom: 6, color: "#555" }}>問題</div>
         <div style={{ fontSize: 22, color: "#111" }}>{display}</div>
       </div>
 
@@ -559,8 +569,8 @@ const inputStyle = {
   fontSize: 16,
   border: "1px solid #ddd",
   borderRadius: 12,
-  background: "#fff",   // ← 白背景
-  color: "#111",        // ← 黒文字
+  background: "#fff",
+  color: "#111",
 };
 
 const selectStyle = { ...inputStyle };
@@ -583,16 +593,16 @@ const questionBoxStyle = {
   borderRadius: 16,
   padding: 14,
   boxShadow: "0 2px 6px rgba(0,0,0,.05)",
-  color: "#111",   // ← ここで枠内のデフォルト文字色を黒に
+  color: "#111",
 };
 
 const reviewStyle = {
   width: "100%",
   background: "#fff",
-  border: "1px solid #eee",
+  border: "1px solid "#eee",
   borderRadius: 16,
   padding: 14,
   marginTop: 12,
   boxShadow: "0 2px 10px rgba(0,0,0,.04)",
-  color: "#111",   // ← 答え合わせボックスの文字色も黒に
+  color: "#111",
 };
