@@ -494,7 +494,7 @@ function QuizFrame({
 
       <div style={questionBoxStyle}>
         <div style={{ opacity: 0.7, fontSize: 12, marginBottom: 6 }}>問題</div>
-        <div style={{ fontSize: 22 }}>{display}</div>
+       <div style={{ fontSize: 22, color: "#111" }}>{display}</div>
       </div>
 
       <label style={labelStyle}>
@@ -533,7 +533,7 @@ function Timer({ label, sec }) {
   return <div style={{ fontFamily: "ui-monospace, monospace" }}>{label}:{mm}:{ss}</div>;
 }
 
-// ========= スタイル（中央寄せ＆枠統一） =========
+// ========= スタイル（中央寄せ＆見え方修正） =========
 const wrapStyle = {
   width: "min(680px, 92vw)",
   margin: "24px auto",
@@ -545,7 +545,7 @@ const wrapStyle = {
   gap: 12,
 };
 
-const labelStyle = { alignSelf: "center", fontSize: 14, marginTop: 8 };
+const labelStyle = { alignSelf: "center", fontSize: 14, marginTop: 8, color: "#fff" }; // ラベルはダーク背景上で白のまま
 
 const inputStyle = {
   width: "100%",
@@ -553,6 +553,8 @@ const inputStyle = {
   fontSize: 16,
   border: "1px solid #ddd",
   borderRadius: 12,
+  background: "#fff",   // ← 白背景
+  color: "#111",        // ← 黒文字
 };
 
 const selectStyle = { ...inputStyle };
@@ -575,6 +577,7 @@ const questionBoxStyle = {
   borderRadius: 16,
   padding: 14,
   boxShadow: "0 2px 6px rgba(0,0,0,.05)",
+  color: "#111",   // ← ここで枠内のデフォルト文字色を黒に
 };
 
 const reviewStyle = {
@@ -585,4 +588,6 @@ const reviewStyle = {
   padding: 14,
   marginTop: 12,
   boxShadow: "0 2px 10px rgba(0,0,0,.04)",
+  color: "#111",   // ← 答え合わせボックスの文字色も黒に
 };
+
