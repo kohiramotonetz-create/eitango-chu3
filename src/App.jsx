@@ -97,9 +97,9 @@ function sampleUnique(arr, k) {
 // ========= メインコンポーネント =========
 export default function App() {
   // 送信UI用の状態（結果画面で使うが、宣言はトップで）
-const [sending, setSending] = useState(false);
-const [progress, setProgress] = useState(0);
-const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [sent, setSent] = useState(false);
 
   // グローバルな state（※Hookは常にコンポーネント直下で宣言：条件分岐内に置かない）
   const [name, setName] = useState("");
@@ -234,269 +234,238 @@ const [sent, setSent] = useState(false);
   // レビュー表示（提出直後に「問題/自分の解答/模範解答」を出す）
   const [showReview, setShowReview] = useState({ visible: false, record: null });
 
+  // await を使わない安全版（ビルドエラー回避）
+  function sendResult() {
+    const url = import.meta.env.VITE_GAS_URL;
+    if (!url) return Promise.reject(new Error("VITE_GAS_URL is empty"));
 
-// await を使わない安全版（ビルドエラー回避）
-function sendResult() {
-  const url = import.meta.env.VITE_GAS_URL;
-  if (!url) return Promise.reject(new Error("VITE_GAS_URL is empty"));
+    const payload = {
+      timestamp: new Date().toISOString(),
+      user_name: name,
+      mode,
+      difficulty: diffChoice,
+      score: answers.filter((a) => a.ok).length,
+      duration_sec: USE_TOTAL_TIMER ? (TOTAL_TIME_SEC_DEFAULT - totalLeft) : null,
+      question_set_id: `auto-${Date.now()}`,
+      questions: items.map((it) => ({ en: it.en, jp: it.jp, level: it.level })),
+      answers,
+      device_info: navigator.userAgent,
+    };
 
-  const payload = {
-    timestamp: new Date().toISOString(),
-    user_name: name,
-    mode,
-    difficulty: diffChoice,
-    score: answers.filter((a) => a.ok).length,
-    duration_sec: USE_TOTAL_TIMER ? (TOTAL_TIME_SEC_DEFAULT - totalLeft) : null,
-    question_set_id: `auto-${Date.now()}`,
-    questions: items.map((it) => ({ en: it.en, jp: it.jp, level: it.level })),
-    answers,
-    device_info: navigator.userAgent,
-  };
-
-  // ← ここは await しない。Promise を返すだけ
-  return fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain;charset=utf-8" }, // プリフライト回避
-    body: JSON.stringify(payload),
-    mode: "no-cors",
-    keepalive: true,
-  });
-}
-
-
-
-
-
-  const payload = {
-    timestamp: new Date().toISOString(),
-    user_name: name,
-    mode,
-    difficulty: diffChoice,
-    score: answers.filter((a) => a.ok).length,
-    duration_sec: USE_TOTAL_TIMER ? (TOTAL_TIME_SEC_DEFAULT - totalLeft) : null,
-    question_set_id: `auto-${Date.now()}`,
-    questions: items.map((it) => ({ en: it.en, jp: it.jp, level: it.level })),
-    answers,
-    device_info: navigator.userAgent,
-  };
-
-  await fetch(url, {
-  method: "POST",
-  headers: { "Content-Type": "text/plain;charset=utf-8" },
-  body: JSON.stringify(payload),
-  mode: "no-cors",
-  keepalive: true,
-});
-
-
-
-
-// ---- 画面描画 ----
-let content = null;
-
-if (step === "start") {
-  content = (
-    <div style={wrapStyle}>
-      <h1 style={{ fontSize: 28, marginBottom: 8 }}>eitango-chu3</h1>
-      <p style={{ opacity: 0.8, marginBottom: 16 }}>スタート画面</p>
-
-      <label style={labelStyle}>あなたの名前</label>
-      <input
-        style={inputStyle}
-        placeholder="例：hira-chan"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-      />
-
-      <label style={labelStyle}>出題形式</label>
-      <select
-        style={selectStyle}
-        value={mode}
-        onChange={(e) => setMode(e.target.value)}
-      >
-        {MODE_CHOICES.map((x) => (
-          <option key={x} value={x}>{x}</option>
-        ))}
-      </select>
-
-      <label style={labelStyle}>難易度</label>
-      <select
-        style={selectStyle}
-        value={diffChoice}
-        onChange={(e) => setDiffChoice(e.target.value)}
-      >
-        {DIFF_CHOICES.map((x) => (
-          <option key={x} value={x}>{x}</option>
-        ))}
-      </select>
-
-      <div style={{ fontSize: 12, marginTop: 8, opacity: 0.8 }}>
-        利用可能な単語数：{filteredPool.length} / {allItems.length}
-      </div>
-
-      <button
-        style={primaryBtnStyle}
-        onClick={startQuiz}
-        disabled={!canStart}
-      >
-        開始（{QUESTION_COUNT}問）
-      </button>
-    </div>
-  );
-} else if (step === "quiz") {
-  const it = items[qIndex];
-  const isJpToEn = mode === "日本語→英単語";
-  content = (
-    <QuizFrame
-      index={qIndex}
-      total={items.length}
-      isJpToEn={isJpToEn}
-      display={isJpToEn ? it.jp : it.en}
-      totalLeft={USE_TOTAL_TIMER ? totalLeft : null}
-      perLeft={perLeft}
-      value={value}
-      setValue={setValue}
-      onSubmit={() => submitAnswer(value)}
-      showReview={showReview}
-      onCloseReview={() => { setShowReview({ visible: false, record: null }); nextQuestion(); }}
-    />
-  );
-} else if (step === "result") {
-  const score = answers.filter((a) => a.ok).length;
-
-  async function handleSend() {
-    setSending(true);
-    setProgress(0);
-
-    const fake = setInterval(() => {
-      setProgress((p) => {
-        if (p >= 100) {
-          clearInterval(fake);
-          setSent(true);
-          setSending(false);
-          return 100;
-        }
-        return p + 10;
-      });
-    }, 200);
-
-    try {
-    await sendResult();
-  } catch (e) {
-    console.error(e);
-    alert("送信に失敗しました。VITE_GAS_URL と GAS の公開設定を確認してください。");
-  }
+    // ← ここは await しない。Promise を返すだけ
+    return fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" }, // プリフライト回避
+      body: JSON.stringify(payload),
+      mode: "no-cors",
+      keepalive: true,
+    });
   }
 
-  const wrongOnly = answers.filter((a) => !a.ok);
-  const handleRetryWrong = () => {
-    const wrongItems = items.filter((_, i) => !answers[i].ok);
-    const next = sampleUnique(
-      wrongItems,
-      Math.min(QUESTION_COUNT, wrongItems.length)
-    );
-    setItems(next);
-    setAnswers([]);
-    setQIndex(0);
-    setStep("quiz");
-  };
+  // ---- 画面描画 ----
+  let content = null;
 
-  content = (
-    <div style={wrapStyle}>
-      <h2 style={{ fontSize: 24, marginBottom: 8 }}>結果</h2>
-      <div style={{ marginBottom: 8 }}>
-        名前：<b>{name}</b> ／ 形式：{mode} ／ 難易度：{diffChoice}
-      </div>
-      <div style={{ fontSize: 20, marginBottom: 16 }}>
-        得点：{score} / {answers.length}
-      </div>
+  if (step === "start") {
+    content = (
+      <div style={wrapStyle}>
+        <h1 style={{ fontSize: 28, marginBottom: 8 }}>eitango-chu3</h1>
+        <p style={{ opacity: 0.8, marginBottom: 16 }}>スタート画面</p>
 
-      <div
-        style={{
-          maxHeight: 300,
-          overflow: "auto",
-          width: "100%",
-          border: "1px solid #ddd",
-          borderRadius: 12,
-          padding: 12,
-          background: "#fafafa",
-          textAlign: "left",
-          color: "#111", // ← 結果一覧の文字色も黒に
-        }}
-      >
-        {answers.map((r, i) => (
-          <div
-            key={i}
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr 1fr",
-              gap: 8,
-              padding: "6px 0",
-              borderBottom: "1px solid #f0f0f0",
-            }}
-          >
-            <div>問題：{r.q}</div>
-            <div>あなた：{r.a || "（無回答）"}</div>
-            <div>
-              模範解答：<b>{r.correct}</b> {r.ok ? "✅" : "❌"}
-            </div>
-          </div>
-        ))}
-      </div>
+        <label style={labelStyle}>あなたの名前</label>
+        <input
+          style={inputStyle}
+          placeholder="例：hira-chan"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
 
-      {!sent && !sending && (
-        <button style={primaryBtnStyle} onClick={handleSend}>
-          結果を送信
+        <label style={labelStyle}>出題形式</label>
+        <select
+          style={selectStyle}
+          value={mode}
+          onChange={(e) => setMode(e.target.value)}
+        >
+          {MODE_CHOICES.map((x) => (
+            <option key={x} value={x}>{x}</option>
+          ))}
+        </select>
+
+        <label style={labelStyle}>難易度</label>
+        <select
+          style={selectStyle}
+          value={diffChoice}
+          onChange={(e) => setDiffChoice(e.target.value)}
+        >
+          {DIFF_CHOICES.map((x) => (
+            <option key={x} value={x}>{x}</option>
+          ))}
+        </select>
+
+        <div style={{ fontSize: 12, marginTop: 8, opacity: 0.8 }}>
+          利用可能な単語数：{filteredPool.length} / {allItems.length}
+        </div>
+
+        <button
+          style={primaryBtnStyle}
+          onClick={startQuiz}
+          disabled={!canStart}
+        >
+          開始（{QUESTION_COUNT}問）
         </button>
-      )}
+      </div>
+    );
+  } else if (step === "quiz") {
+    const it = items[qIndex];
+    const isJpToEn = mode === "日本語→英単語";
+    content = (
+      <QuizFrame
+        index={qIndex}
+        total={items.length}
+        isJpToEn={isJpToEn}
+        display={isJpToEn ? it.jp : it.en}
+        totalLeft={USE_TOTAL_TIMER ? totalLeft : null}
+        perLeft={perLeft}
+        value={value}
+        setValue={setValue}
+        onSubmit={() => submitAnswer(value)}
+        showReview={showReview}
+        onCloseReview={() => { setShowReview({ visible: false, record: null }); nextQuestion(); }}
+      />
+    );
+  } else if (step === "result") {
+    const score = answers.filter((a) => a.ok).length;
 
-      {sending && (
-        <div style={{ marginTop: 12, width: "80%" }}>
-          <div
-            style={{
-              height: 10,
-              background: "#eee",
-              borderRadius: 5,
-              overflow: "hidden",
-              marginBottom: 6,
-            }}
-          >
+    async function handleSend() {
+      setSending(true);
+      setProgress(0);
+
+      const fake = setInterval(() => {
+        setProgress((p) => {
+          if (p >= 100) {
+            clearInterval(fake);
+            setSent(true);
+            setSending(false);
+            return 100;
+          }
+          return p + 10;
+        });
+      }, 200);
+
+      try {
+        await sendResult();
+      } catch (e) {
+        console.error(e);
+        alert("送信に失敗しました。VITE_GAS_URL と GAS の公開設定を確認してください。");
+      }
+    }
+
+    const wrongOnly = answers.filter((a) => !a.ok);
+    const handleRetryWrong = () => {
+      const wrongItems = items.filter((_, i) => !answers[i].ok);
+      const next = sampleUnique(
+        wrongItems,
+        Math.min(QUESTION_COUNT, wrongItems.length)
+      );
+      setItems(next);
+      setAnswers([]);
+      setQIndex(0);
+      setStep("quiz");
+    };
+
+    content = (
+      <div style={wrapStyle}>
+        <h2 style={{ fontSize: 24, marginBottom: 8 }}>結果</h2>
+        <div style={{ marginBottom: 8 }}>
+          名前：<b>{name}</b> ／ 形式：{mode} ／ 難易度：{diffChoice}
+        </div>
+        <div style={{ fontSize: 20, marginBottom: 16 }}>
+          得点：{score} / {answers.length}
+        </div>
+
+        <div
+          style={{
+            maxHeight: 300,
+            overflow: "auto",
+            width: "100%",
+            border: "1px solid #ddd",
+            borderRadius: 12,
+            padding: 12,
+            background: "#fafafa",
+            textAlign: "left",
+            color: "#111", // ← 結果一覧の文字色も黒に
+          }}
+        >
+          {answers.map((r, i) => (
+            <div
+              key={i}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                gap: 8,
+                padding: "6px 0",
+                borderBottom: "1px solid #f0f0f0",
+              }}
+            >
+              <div>問題：{r.q}</div>
+              <div>あなた：{r.a || "（無回答）"}</div>
+              <div>
+                模範解答：<b>{r.correct}</b> {r.ok ? "✅" : "❌"}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {!sent && !sending && (
+          <button style={primaryBtnStyle} onClick={handleSend}>
+            結果を送信
+          </button>
+        )}
+
+        {sending && (
+          <div style={{ marginTop: 12, width: "80%" }}>
             <div
               style={{
-                width: `${progress}%`,
-                height: "100%",
-                background: "#111",
-                transition: "width 0.2s linear",
+                height: 10,
+                background: "#eee",
+                borderRadius: 5,
+                overflow: "hidden",
+                marginBottom: 6,
               }}
-            />
+            >
+              <div
+                style={{
+                  width: `${progress}%`,
+                  height: "100%",
+                  background: "#111",
+                  transition: "width 0.2s linear",
+                }}
+              />
+            </div>
+            <div>{progress}% 送信中...</div>
           </div>
-          <div>{progress}% 送信中...</div>
-        </div>
-      )}
+        )}
 
-      {sent && (
-        <>
-          <div style={{ marginTop: 16, fontWeight: "bold" }}>✅ 送信完了！</div>
-          <div style={{ display: "flex", gap: 12, marginTop: 16, justifyContent: "center" }}>
-            <button style={primaryBtnStyle} onClick={() => setStep("start")}>
-              ホームへ戻る
-            </button>
-            {wrongOnly.length > 0 && (
-              <button style={primaryBtnStyle} onClick={handleRetryWrong}>
-                間違えた問題を復習
+        {sent && (
+          <>
+            <div style={{ marginTop: 16, fontWeight: "bold" }}>✅ 送信完了！</div>
+            <div style={{ display: "flex", gap: 12, marginTop: 16, justifyContent: "center" }}>
+              <button style={primaryBtnStyle} onClick={() => setStep("start")}>
+                ホームへ戻る
               </button>
-            )}
-          </div>
-        </>
-      )}
-    </div>
-  );
+              {wrongOnly.length > 0 && (
+                <button style={primaryBtnStyle} onClick={handleRetryWrong}>
+                  間違えた問題を復習
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  return content;
 }
-
-return content;
-}
-
-
 
 // ========= 小さめのUI部品 =========
 function QuizFrame({
@@ -531,7 +500,7 @@ function QuizFrame({
 
       <div style={questionBoxStyle}>
         <div style={{ opacity: 0.7, fontSize: 12, marginBottom: 6 }}>問題</div>
-       <div style={{ fontSize: 22, color: "#111" }}>{display}</div>
+        <div style={{ fontSize: 22, color: "#111" }}>{display}</div>
       </div>
 
       <label style={labelStyle}>
@@ -627,4 +596,3 @@ const reviewStyle = {
   boxShadow: "0 2px 10px rgba(0,0,0,.04)",
   color: "#111",   // ← 答え合わせボックスの文字色も黒に
 };
-
