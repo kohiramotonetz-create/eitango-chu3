@@ -229,7 +229,6 @@ const [sent, setSent] = useState(false);
     if (perTimerRef.current) clearInterval(perTimerRef.current);
     if (totalTimerRef.current) clearInterval(totalTimerRef.current);
     setStep("result");
-    sendResult();
   }
 
   // レビュー表示（提出直後に「問題/自分の解答/模範解答」を出す）
@@ -534,7 +533,7 @@ function Timer({ label, sec }) {
   return <div style={{ fontFamily: "ui-monospace, monospace" }}>{label}:{mm}:{ss}</div>;
 }
 
-// ========= スタイル =========
+// ========= スタイル（中央寄せ＆枠統一） =========
 const wrapStyle = {
   width: "min(680px, 92vw)",
   margin: "24px auto",
@@ -546,6 +545,29 @@ const wrapStyle = {
   gap: 12,
 };
 
+const labelStyle = { alignSelf: "center", fontSize: 14, marginTop: 8 };
+
+const inputStyle = {
+  width: "100%",
+  padding: "12px 14px",
+  fontSize: 16,
+  border: "1px solid #ddd",
+  borderRadius: 12,
+};
+
+const selectStyle = { ...inputStyle };
+
+const primaryBtnStyle = {
+  marginTop: 12,
+  padding: "12px 18px",
+  borderRadius: 12,
+  border: "none",
+  background: "#111",
+  color: "#fff",
+  fontSize: 16,
+  cursor: "pointer",
+};
+
 const questionBoxStyle = {
   width: "100%",
   background: "#f7f7f7",
@@ -555,4 +577,12 @@ const questionBoxStyle = {
   boxShadow: "0 2px 6px rgba(0,0,0,.05)",
 };
 
-const reviewStyle = { width: "100%", background: "#fff", border: "1px solid #eee", borderRadius: 16, padding: 14, marginTop: 12, boxShadow: "0 2px 10px rgba(0,0,0,.04)" };
+const reviewStyle = {
+  width: "100%",
+  background: "#fff",
+  border: "1px solid #eee",
+  borderRadius: 16,
+  padding: 14,
+  marginTop: 12,
+  boxShadow: "0 2px 10px rgba(0,0,0,.04)",
+};
