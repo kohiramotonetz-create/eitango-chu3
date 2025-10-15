@@ -278,26 +278,15 @@ async function sendResult() {
     device_info: navigator.userAgent,
   };
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    // CORSはApps ScriptのWeb Appなら基本OK。必要なら次行を有効化:
-    // mode: "no-cors",
-    body: JSON.stringify(payload),
-    redirect: "follow",
-    keepalive: true, // タブ遷移時も投げ切る保険
-  });
+  await fetch(url, {
+  method: "POST",
+  headers: { "Content-Type": "text/plain;charset=utf-8" },
+  body: JSON.stringify(payload),
+  mode: "no-cors",
+  keepalive: true,
+});
 
-  // no-cors でない限り、ステータス確認
-  try {
-    const text = await res.text();
-    console.log("GAS response:", res.status, text);
-  } catch {}
 
-  if (!res.ok && res.type !== "opaque") {
-    throw new Error("GAS POST failed: " + res.status);
-  }
-}
 
 
 // ---- 画面描画 ----
