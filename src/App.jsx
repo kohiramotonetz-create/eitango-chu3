@@ -236,10 +236,30 @@ const [sent, setSent] = useState(false);
 
   async function sendResult() {
   const url = import.meta.env.VITE_GAS_URL;
-  if (!url) {
-    console.warn("VITE_GAS_URL が未設定です");
-    throw new Error("VITE_GAS_URL is empty");
-  }
+  if (!url) throw new Error("VITE_GAS_URL is empty");
+
+  const payload = {
+    timestamp: new Date().toISOString(),
+    user_name: name,
+    mode,
+    difficulty: diffChoice,
+    score: answers.filter((a) => a.ok).length,
+    duration_sec: USE_TOTAL_TIMER ? (TOTAL_TIME_SEC_DEFAULT - totalLeft) : null,
+    question_set_id: `auto-${Date.now()}`,
+    questions: items.map((it) => ({ en: it.en, jp: it.jp, level: it.level })),
+    answers,
+    device_info: navigator.userAgent,
+  };
+
+  await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" }, // ← ここ重要
+    body: JSON.stringify(payload),
+    mode: "no-cors",   // ← プリフライト回避
+    keepalive: true,   // ← ページ遷移時も送信し切る保険
+  });
+}
+
 
   const payload = {
     timestamp: new Date().toISOString(),
