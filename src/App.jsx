@@ -261,45 +261,38 @@ export default function App() {
       keepalive: true,
     });
   }
-  // ---- A案：古文方式（simple request + JSON応答で成否を判定）----
-  async function sendResult() {
-    const url = import.meta.env.VITE_GAS_URL;
-    if (!url) throw new Error("VITE_GAS_URL is empty");
+  // A案（古文式・成否はUIで即時判定しない）
+async function sendResult() {
+  const url = import.meta.env.VITE_GAS_URL;
+  if (!url) throw new Error("VITE_GAS_URL is empty");
 
-    const payload = {
-      timestamp: new Date().toISOString(),
-      user_name: name,
-      mode,
-      difficulty: diffChoice,
-      score: answers.filter((a) => a.ok).length,
-      duration_sec: USE_TOTAL_TIMER ? (TOTAL_TIME_SEC_DEFAULT - totalLeft) : null,
-      question_set_id: `auto-${Date.now()}`,
-      questions: items.map((it) => ({ en: it.en, jp: it.jp, level: it.level })),
-      answers,
-      device_info: navigator.userAgent,
-    };
+  const payload = {
+    timestamp: new Date().toISOString(),
+    user_name: name,
+    mode,
+    difficulty: diffChoice,
+    score: answers.filter((a) => a.ok).length,
+    duration_sec: USE_TOTAL_TIMER ? (TOTAL_TIME_SEC_DEFAULT - totalLeft) : null,
+    question_set_id: `auto-${Date.now()}`,
+    questions: items.map((it) => ({ en: it.en, jp: it.jp, level: it.level })),
+    answers,
+    device_info: navigator.userAgent,
+  };
 
-    const body = new URLSearchParams({ payload: JSON.stringify(payload) });
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-      },
-      body,
-    });
+  const body = new URLSearchParams({ payload: JSON.stringify(payload) });
 
-    // GAS は JSON を返す（{ ok:true, ... } 想定）
-    let json;
-    try {
-      json = await res.json();
-    } catch (e) {
-      throw new Error("サーバ応答(JSON)の解析に失敗しました");
-    }
-    if (!res.ok || !json || json.ok !== true) {
-      throw new Error(json && json.error ? json.error : "サーバがエラーを返しました");
-    }
-    return json; // { ok:true, confirmation_id?... }
-  }
+  // 応答は読まない（CORS回避）。エラーは基本的に発火しません。
+  fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+    },
+    body,
+    mode: "no-cors",
+    keepalive: true, // ページ遷移時の送信もできるだけ維持
+  });
+}
+
 
   // ---- 画面描画 ----
   let content = null;
