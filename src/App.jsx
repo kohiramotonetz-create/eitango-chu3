@@ -333,7 +333,6 @@ const [sent, setSent] = useState(false);
     );
   }
 
- {
 -  if (step === "result") {
   const score = answers.filter((a) => a.ok).length;
 
