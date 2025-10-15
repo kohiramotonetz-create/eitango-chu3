@@ -599,7 +599,7 @@ const questionBoxStyle = {
 const reviewStyle = {
   width: "100%",
   background: "#fff",
-  border: "1px solid "#eee",
+  border: "1px solid #eee",
   borderRadius: 16,
   padding: 14,
   marginTop: 12,
