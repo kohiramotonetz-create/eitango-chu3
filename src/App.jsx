@@ -416,19 +416,22 @@ async function sendResult() {
         </div>
 
         {/* 結果一覧（中央寄せ・背景統一） */}
-        <div
-          style={{
-            maxHeight: 300,
-            overflow: "auto",
-            width: "100%",
-            border: "1px solid #ddd",
-            borderRadius: 12,
-            padding: 12,
-            background: "#fafafa",
-            textAlign: "left",
-            color: "#111",
-          }}
-        >
+       <div
+        style={{
+          maxHeight: 300,
+          overflow: "auto",
+          width: "100%",
+          border: "1px solid #ddd",
+          borderRadius: 12,
+          padding: 12,
+          background: "#fafafa",
+          textAlign: "left",
+          color: "#111",
+          marginInline: "auto",   // 追加
+          boxSizing: "border-box" // 追加
+        }}
+>
+
           {answers.map((r, i) => (
             <div
               key={i}
@@ -585,13 +588,19 @@ function Timer({ label, sec }) {
 // ========= スタイル（中央寄せ＆見え方修正） =========
 const wrapStyle = {
   width: "min(680px, 92vw)",
-  margin: "24px auto",
+  maxWidth: "100%",
+  margin: "0 auto",
+  marginInline: "auto",
+  padding: "24px 16px",
   display: "flex",
   flexDirection: "column",
-  alignItems: "center",
+  alignItems: "stretch",
   justifyContent: "center",
   textAlign: "center",
   gap: 12,
+  boxSizing: "border-box",
+  alignSelf: "center",
+  flex: "0 0 auto",
 };
 
 const labelStyle = { alignSelf: "center", fontSize: 14, marginTop: 8, color: "#fff" }; // ラベルはダーク背景上で白のまま
@@ -621,6 +630,7 @@ const primaryBtnStyle = {
 
 const questionBoxStyle = {
   width: "100%",
+  marginInline: "auto",
   background: "#f7f7f7",
   border: "1px solid #ddd",
   borderRadius: 16,
@@ -629,8 +639,10 @@ const questionBoxStyle = {
   color: "#111",
 };
 
+
 const reviewStyle = {
   width: "100%",
+  marginInline: "auto",
   background: "#fff",
   border: "1px solid #eee",
   borderRadius: 16,
