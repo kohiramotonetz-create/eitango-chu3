@@ -190,16 +190,28 @@ export default function App() {
     setPerLeft(PER_Q_TIME_SEC_DEFAULT);
     if (perTimerRef.current) clearInterval(perTimerRef.current);
     perTimerRef.current = setInterval(() => {
-      setPerLeft((t) => {
-        if (t <= 1) {
-          // 時間切れ=未回答 → レビューは出さず自動で次問へ
-          submitAnswer("", { skipReview: true });
-          nextQuestion();
-          return PER_Q_TIME_SEC_DEFAULT; // 表示上の秒数も直ちにリセット
-        }
-        return t - 1;
-      });
-    }, 1000);
+  　　setPerLeft((t) => {
+    　　if (t <= 1) {
+      　　// 時間切れ=未回答 → レビューなしで自動遷移（クロージャ安全）
+      　　submitAnswer("", { skipReview: true });
+
+      　　setQIndex((i) => {
+      　　  const next = i + 1;
+       　　 if (next >= items.length) {
+        　　  finishQuiz(); // 最終問題なら結果へ
+          return i;     // indexは据え置き（結果画面に遷移）
+        　　}
+       　　 // 次問のパータイマー表示を即リセット
+       　　 setPerLeft(PER_Q_TIME_SEC_DEFAULT);
+       　　 return next;
+      　　});
+
+     　　 // 画面上の残り秒も即 20 秒に戻す
+     　　 return PER_Q_TIME_SEC_DEFAULT;
+   　　 }
+   　　 return t - 1;
+ 　　 });
+　　　}, 1000);
   }
 
   function submitAnswer(userInput, { skipReview = false } = {}) {
