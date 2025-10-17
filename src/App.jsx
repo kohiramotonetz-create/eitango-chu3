@@ -295,13 +295,13 @@ async function sendResult() {
   if (step === "start") {
     content = (
       <div style={wrapStyle}>
-        <h1 style={{ fontSize: 28, marginBottom: 8 }}>eitango-chu3</h1>
+        <h1 style={{ fontSize: 28, marginBottom: 8 }}>中３英単語</h1>
         <p style={{ opacity: 0.8, marginBottom: 16 }}>スタート画面</p>
 
         <label style={labelStyle}>あなたの名前</label>
         <input
           style={inputStyle}
-          placeholder="例：hira-chan"
+          placeholder="例：ネッツ　太郎"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
