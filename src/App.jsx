@@ -192,28 +192,31 @@ export default function App() {
     perTimerRef.current = setInterval(() => {
       setPerLeft((t) => {
         if (t <= 1) {
-          // 時間切れ=未回答
-          submitAnswer("");
-          return PER_Q_TIME_SEC_DEFAULT; // 次問でリセット
+          // 時間切れ=未回答 → レビューは出さず自動で次問へ
+          submitAnswer("", { skipReview: true });
+          nextQuestion();
+          return PER_Q_TIME_SEC_DEFAULT; // 表示上の秒数も直ちにリセット
         }
         return t - 1;
       });
     }, 1000);
   }
 
-  function submitAnswer(userInput) {
-    const item = items[qIndex];
-    const ok = judgeAnswer({ mode, user: userInput, item });
-    const record = {
-      qIndex,
-      q: mode === "日本語→英単語" ? item.jp : item.en,
-      a: userInput,
-      correct: mode === "日本語→英単語" ? item.en : item.jp,
-      ok,
-    };
-    setAnswers((prev) => [...prev, record]);
+  function submitAnswer(userInput, { skipReview = false } = {}) {
+  const item = items[qIndex];
+  const ok = judgeAnswer({ mode, user: userInput, item });
+  const record = {
+    qIndex,
+    q: mode === "日本語→英単語" ? item.jp : item.en,
+    a: userInput,
+    correct: mode === "日本語→英単語" ? item.en : item.jp,
+    ok,
+  };
+  setAnswers((prev) => [...prev, record]);
+  if (!skipReview) {
     setShowReview({ visible: true, record });
   }
+}
 
   function nextQuestion() {
     if (qIndex + 1 >= items.length) {
