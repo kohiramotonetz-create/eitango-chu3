@@ -4,7 +4,7 @@ import wordsCsv from "./data/words.csv?raw"; // A:No / B:英単語 / C:日本語
 // ========= 設定 =========
 const QUESTION_COUNT = 20;
 const TOTAL_TIME_SEC_DEFAULT = 300; // 全体5分
-const PER_Q_TIME_SEC_DEFAULT = 20;  // 各問15〜30秒の中庸
+const PER_Q_TIME_SEC_DEFAULT = 20;  // 各問15〜30秒の中庸（※今回は使わないが残しておく）
 const USE_TOTAL_TIMER = true;       // 既定：全体タイマー優先
 const SKIP_HEADER = false;          // CSV先頭行にヘッダーがある場合のみ true
 
@@ -115,9 +115,9 @@ export default function App() {
 
   // timers
   const [totalLeft, setTotalLeft] = useState(TOTAL_TIME_SEC_DEFAULT);
-  const [perLeft, setPerLeft] = useState(PER_Q_TIME_SEC_DEFAULT);
+  const [perLeft, setPerLeft] = useState(null);            // ★変更: 各問タイマー廃止 → null 運用
   const totalTimerRef = useRef(null);
-  const perTimerRef = useRef(null);
+  // const perTimerRef = useRef(null);                     // ★変更: 各問タイマー廃止のため未使用
 
   // CSV読み込み
   useEffect(() => {
@@ -158,7 +158,7 @@ export default function App() {
   useEffect(() => {
     return () => {
       if (totalTimerRef.current) clearInterval(totalTimerRef.current);
-      if (perTimerRef.current) clearInterval(perTimerRef.current);
+      // if (perTimerRef.current) clearInterval(perTimerRef.current); // ★変更: 各問タイマー廃止
     };
   }, []);
 
@@ -172,7 +172,7 @@ export default function App() {
     setQIndex(0);
     setStep("quiz");
 
-    // timers init
+    // timers init（全体のみ）
     if (USE_TOTAL_TIMER) {
       setTotalLeft(TOTAL_TIME_SEC_DEFAULT);
       if (totalTimerRef.current) clearInterval(totalTimerRef.current);
@@ -187,48 +187,28 @@ export default function App() {
         });
       }, 1000);
     }
-    setPerLeft(PER_Q_TIME_SEC_DEFAULT);
-    if (perTimerRef.current) clearInterval(perTimerRef.current);
-    perTimerRef.current = setInterval(() => {
-  　　setPerLeft((t) => {
-    　　if (t <= 1) {
-      　　// 時間切れ=未回答 → レビューなしで自動遷移（クロージャ安全）
-      　　submitAnswer("", { skipReview: true });
 
-      　　setQIndex((i) => {
-      　　  const next = i + 1;
-       　　 if (next >= items.length) {
-        　　  finishQuiz(); // 最終問題なら結果へ
-          return i;     // indexは据え置き（結果画面に遷移）
-        　　}
-       　　 // 次問のパータイマー表示を即リセット
-       　　 setPerLeft(PER_Q_TIME_SEC_DEFAULT);
-       　　 return next;
-      　　});
-
-     　　 // 画面上の残り秒も即 20 秒に戻す
-     　　 return PER_Q_TIME_SEC_DEFAULT;
-   　　 }
-   　　 return t - 1;
- 　　 });
-　　　}, 1000);
+    setPerLeft(null); // ★変更: 各問タイマーを使わない明示
+    // if (perTimerRef.current) clearInterval(perTimerRef.current); // ★変更: 廃止
+    // perTimerRef.current = ...（削除）
   }
 
-  function submitAnswer(userInput, { skipReview = false } = {}) {
-  const item = items[qIndex];
-  const ok = judgeAnswer({ mode, user: userInput, item });
-  const record = {
-    qIndex,
-    q: mode === "日本語→英単語" ? item.jp : item.en,
-    a: userInput,
-    correct: mode === "日本語→英単語" ? item.en : item.jp,
-    ok,
-  };
-  setAnswers((prev) => [...prev, record]);
-  if (!skipReview) {
+  function submitAnswer(userInput) {
+    // ★安全化: items[qIndex] がなければ何もしない
+    const item = items[qIndex];
+    if (!item) return;
+
+    const ok = judgeAnswer({ mode, user: userInput, item });
+    const record = {
+      qIndex,
+      q: mode === "日本語→英単語" ? item.jp : item.en,
+      a: userInput,
+      correct: mode === "日本語→英単語" ? item.en : item.jp,
+      ok,
+    };
+    setAnswers((prev) => [...prev, record]);
     setShowReview({ visible: true, record });
   }
-}
 
   function nextQuestion() {
     if (qIndex + 1 >= items.length) {
@@ -236,11 +216,11 @@ export default function App() {
       return;
     }
     setQIndex(qIndex + 1);
-    setPerLeft(PER_Q_TIME_SEC_DEFAULT);
+    // setPerLeft(PER_Q_TIME_SEC_DEFAULT); // ★変更: 各問タイマー廃止
   }
 
   function finishQuiz() {
-    if (perTimerRef.current) clearInterval(perTimerRef.current);
+    // if (perTimerRef.current) clearInterval(perTimerRef.current); // ★変更: 廃止
     if (totalTimerRef.current) clearInterval(totalTimerRef.current);
     setStep("result");
   }
@@ -363,22 +343,32 @@ async function sendResult() {
     );
   } else if (step === "quiz") {
     const it = items[qIndex];
-    const isJpToEn = mode === "日本語→英単語";
-    content = (
-      <QuizFrame
-        index={qIndex}
-        total={items.length}
-        isJpToEn={isJpToEn}
-        display={isJpToEn ? it.jp : it.en}
-        totalLeft={USE_TOTAL_TIMER ? totalLeft : null}
-        perLeft={perLeft}
-        value={value}
-        setValue={setValue}
-        onSubmit={() => submitAnswer(value)}
-        showReview={showReview}
-        onCloseReview={() => { setShowReview({ visible: false, record: null }); nextQuestion(); }}
-      />
-    );
+
+    // ★安全ガード: 稀に不整合があっても描画で落ちないように
+    if (!it) {
+      content = (
+        <div style={wrapStyle}>
+          <div style={{ fontSize: 16, opacity: 0.8 }}>読み込み中...</div>
+        </div>
+      );
+    } else {
+      const isJpToEn = mode === "日本語→英単語";
+      content = (
+        <QuizFrame
+          index={qIndex}
+          total={items.length}
+          isJpToEn={isJpToEn}
+          display={isJpToEn ? it.jp : it.en}
+          totalLeft={USE_TOTAL_TIMER ? totalLeft : null}
+          perLeft={perLeft} // ★null のまま渡す → 下で表示しない
+          value={value}
+          setValue={setValue}
+          onSubmit={() => submitAnswer(value)}
+          showReview={showReview}
+          onCloseReview={() => { setShowReview({ visible: false, record: null }); nextQuestion(); }}
+        />
+      );
+    }
   } else if (step === "result") {
     const score = answers.filter((a) => a.ok).length;
 
@@ -442,8 +432,8 @@ async function sendResult() {
           background: "#fafafa",
           textAlign: "left",
           color: "#111",
-          marginInline: "auto",   // 追加
-          boxSizing: "border-box" // 追加
+          marginInline: "auto",
+          boxSizing: "border-box"
         }}
 >
 
@@ -555,7 +545,7 @@ function QuizFrame({
         <div>Q {index + 1} / {total}</div>
         <div style={{ display: "flex", gap: 12 }}>
           {totalLeft != null && <Timer label="全体" sec={totalLeft} />}
-          <Timer label="この問題" sec={perLeft} />
+          {perLeft != null && <Timer label="この問題" sec={perLeft} />}{/* ★変更: perLeft が null のときは非表示 */}
         </div>
       </div>
 
@@ -653,7 +643,6 @@ const questionBoxStyle = {
   boxShadow: "0 2px 6px rgba(0,0,0,.05)",
   color: "#111",
 };
-
 
 const reviewStyle = {
   width: "100%",
