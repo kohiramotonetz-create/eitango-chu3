@@ -557,25 +557,105 @@ function QuizFrame({
         onKeyDown={(e) => { if (e.key === "Enter") onSubmit(); }}
         placeholder={isJpToEn ? "example: run" : "例：はしる（カタカナでもOK）"}
       />
-      <button style={primaryBtnStyle} onClick={onSubmit}>答え合わせ</button>
 
-      {showReview.visible && (
-        <div style={reviewStyle}>
-          <div style={{ fontWeight: "bold", marginBottom: 8 }}>答え合わせ</div>
-          <div>問題：{showReview.record.q}</div>
-          <div>あなた：{showReview.record.a || "（無回答）"}</div>
-          <div>
-            模範解答：<b>{showReview.record.correct}</b>{" "}
-            {showReview.record.ok ? "✅ 正解" : "❌ 不正解"}
-          </div>
-          <button style={{ ...primaryBtnStyle, marginTop: 12 }} onClick={onCloseReview}>
-            次の問題へ
-          </button>
+      {/* 答え合わせボタン：レビュー中は無効化 */}
+<button
+  style={{ ...primaryBtnStyle, opacity: showReview.visible ? 0.6 : 1 }}
+  onClick={onSubmit}
+  disabled={showReview.visible}
+>
+  答え合わせ
+</button>
+
+{showReview.visible && (
+  <div style={reviewStyle}>
+    <div style={{ fontWeight: "bold", marginBottom: 8 }}>答え合わせ</div>
+    <div>問題：{showReview.record.q}</div>
+    <div>あなた：{showReview.record.a || "（無回答）"}</div>
+    <div>
+      模範解答：<b>{showReview.record.correct}</b>{" "}
+      {showReview.record.ok ? "✅ 正解" : "❌ 不正解"}
+    </div>
+
+    {/* 不正解の場合だけ、正解入力フォームを表示 */}
+    {!showReview.record.ok && (
+      <ReviewCorrection
+        isJpToEn={isJpToEn}
+        correct={showReview.record.correct}
+        onSuccess={onCloseReview}
+      />
+    )}
+
+    {/* Next は「最初から正解」か「修正で正解後」に押せる */}
+    <ReviewNextButton
+      enabled={showReview.record.ok}
+      onClick={onCloseReview}
+    />
+  </div>
+)}
+
+function ReviewCorrection({ isJpToEn, correct, onSuccess }) {
+  const [val, setVal] = React.useState("");
+  const [ok, setOk] = React.useState(false);
+
+  // フォーム表示のたびにリセット
+  React.useEffect(() => { setVal(""); setOk(false); }, [correct]);
+
+  function check() {
+    const normalize = (s) => trimSpaces(s);
+    let pass;
+    if (isJpToEn) {
+      // 日本語→英単語：英単語は完全一致（前後空白無視）
+      pass = normalize(val) === normalize(correct);
+    } else {
+      // 英単語→日本語：かな同一視（前後空白無視）
+      pass = toHiragana(normalize(val)) === toHiragana(normalize(correct));
+    }
+    setOk(pass);
+    if (pass) onSuccess(); // 正解したら即「次の問題へ」
+  }
+
+  return (
+    <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
+      <input
+        style={inputStyle}
+        placeholder={isJpToEn ? "ここに英単語を入力" : "ここに日本語（かな可）を入力"}
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") check(); }}
+      />
+      <button
+        style={primaryBtnStyle}
+        onClick={check}
+      >
+        正解で次へ
+      </button>
+      {!ok && val && (
+        <div style={{ gridColumn: "1 / -1", color: "#b91c1c", fontSize: 13 }}>
+          もう一度チャレンジ！（正解すると自動で次へ進みます）
         </div>
       )}
     </div>
   );
 }
+
+function ReviewNextButton({ enabled, onClick }) {
+  return (
+    <button
+      style={{
+        ...primaryBtnStyle,
+        marginTop: 12,
+        opacity: enabled ? 1 : 0.5,
+        cursor: enabled ? "pointer" : "not-allowed",
+      }}
+      onClick={enabled ? onClick : undefined}
+      disabled={!enabled}
+    >
+      次の問題へ
+    </button>
+  );
+}
+
 
 function Timer({ label, sec }) {
   const mm = String(Math.floor(sec / 60)).padStart(2, "0");
