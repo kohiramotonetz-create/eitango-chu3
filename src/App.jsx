@@ -186,6 +186,39 @@ export default function App() {
   // ここでは特にクリーンアップ不要（停止は isPaused 側で実施）
 }, [isPaused, USE_TOTAL_TIMER]);
 
+// ★追加：レビュー中は停止、再開時に interval を張り直す
+useEffect(() => {
+  if (!USE_TOTAL_TIMER) return;
+
+  // 停止状態なら interval を確実に止める
+  if (isPaused) {
+    if (totalTimerRef.current) {
+      clearInterval(totalTimerRef.current);
+      totalTimerRef.current = null;
+    }
+    return;
+  }
+
+  // 動作状態かつ interval 未設定なら開始
+  if (!totalTimerRef.current) {
+    totalTimerRef.current = setInterval(() => {
+      setTotalLeft((t) => {
+        if (t <= 1) {
+          if (totalTimerRef.current) {
+            clearInterval(totalTimerRef.current);
+            totalTimerRef.current = null;
+          }
+          finishQuiz(); // 0秒で終了へ
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+  }
+  // cleanup は isPaused 側で実施
+}, [isPaused, USE_TOTAL_TIMER, finishQuiz, setTotalLeft]);
+
+
   // アンマウント時にタイマー停止
   useEffect(() => {
     return () => {
@@ -206,13 +239,14 @@ export default function App() {
 
     // timers init（全体のみ）
       if (USE_TOTAL_TIMER) {
-    // ★変更：残り時間だけ初期化。intervalの開始/停止は useEffect に任せる
-    setTotalLeft(TOTAL_TIME_SEC_DEFAULT);
-    if (totalTimerRef.current) {
-      clearInterval(totalTimerRef.current);
-      totalTimerRef.current = null;
-    }
+  // ★変更：残り時間だけ初期化。interval 開始/停止は useEffect に任せる
+  setTotalLeft(TOTAL_TIME_SEC_DEFAULT);
+  if (totalTimerRef.current) {
+    clearInterval(totalTimerRef.current);
+    totalTimerRef.current = null;
   }
+}
+
 
 
     setPerLeft(null); // ★変更: 各問タイマーを使わない明示
@@ -254,37 +288,16 @@ export default function App() {
 
   // レビュー表示（提出直後に「問題/自分の解答/模範解答」を出す）
   const [showReview, setShowReview] = useState({ visible: false, record: null });
+  // ★追加：レビュー中 or quiz以外は一時停止（依存を明示）
+const isPaused = React.useMemo(
+  () => (step !== "quiz") || showReview.visible,
+  [step, showReview.visible]
+);
+
   // ★追加：quiz中以外 or レビュー表示中は一時停止
 　const isPaused = (step !== "quiz") || showReview.visible;
 
   
-  // ---- CORS対策済みの送信関数（awaitを使わない版）----
-  function sendResult() {
-    const url = import.meta.env.VITE_GAS_URL;
-    if (!url) return Promise.reject(new Error("VITE_GAS_URL is empty"));
-
-    const payload = {
-      timestamp: new Date().toISOString(),
-      user_name: name,
-      mode,
-      difficulty: diffChoice,
-      score: answers.filter((a) => a.ok).length,
-      duration_sec: USE_TOTAL_TIMER ? (TOTAL_TIME_SEC_DEFAULT - totalLeft) : null,
-      question_set_id: `auto-${Date.now()}`,
-      questions: items.map((it) => ({ en: it.en, jp: it.jp, level: it.level })),
-      answers,
-      device_info: navigator.userAgent,
-    };
-
-    // プリフライトを避ける（text/plain + no-cors）
-    return fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload),
-      mode: "no-cors",
-      keepalive: true,
-    });
-  }
   // A案（古文式・成否はUIで即時判定しない）
 async function sendResult() {
   const url = import.meta.env.VITE_GAS_URL;
