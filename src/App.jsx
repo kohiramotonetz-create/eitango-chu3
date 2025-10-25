@@ -588,7 +588,7 @@ function QuizFrame({
 
     {/* Next は「最初から正解」か「修正で正解後」に押せる */}
     <ReviewNextButton
-      enabled={showReview.record.ok}
+       enabled={true} // ✅ 不正解でも押せるように変更
       onClick={onCloseReview}
     />
   </div>
