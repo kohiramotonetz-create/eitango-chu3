@@ -286,16 +286,15 @@ useEffect(() => {
     setStep("result");
   }
 
-  // レビュー表示（提出直後に「問題/自分の解答/模範解答」を出す）
-  const [showReview, setShowReview] = useState({ visible: false, record: null });
-  // ★追加：レビュー中 or quiz以外は一時停止（依存を明示）
+// レビュー表示（提出直後に「問題/自分の解答/模範解答」を出す）
+const [showReview, setShowReview] = useState({ visible: false, record: null });
+
+// ★追加：レビュー中 or quiz以外は一時停止（依存を明示）
 const isPaused = React.useMemo(
   () => (step !== "quiz") || showReview.visible,
   [step, showReview.visible]
 );
 
-  // ★追加：quiz中以外 or レビュー表示中は一時停止
-　const isPaused = (step !== "quiz") || showReview.visible;
 
   
   // A案（古文式・成否はUIで即時判定しない）
