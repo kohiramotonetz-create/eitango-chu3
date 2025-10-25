@@ -205,20 +205,15 @@ export default function App() {
     setStep("quiz");
 
     // timers init（全体のみ）
-    if (USE_TOTAL_TIMER) {
-      setTotalLeft(TOTAL_TIME_SEC_DEFAULT);
-      if (totalTimerRef.current) clearInterval(totalTimerRef.current);
-      totalTimerRef.current = setInterval(() => {
-        setTotalLeft((t) => {
-          if (t <= 1) {
-            clearInterval(totalTimerRef.current);
-            finishQuiz();
-            return 0;
-          }
-          return t - 1;
-        });
-      }, 1000);
+      if (USE_TOTAL_TIMER) {
+    // ★変更：残り時間だけ初期化。intervalの開始/停止は useEffect に任せる
+    setTotalLeft(TOTAL_TIME_SEC_DEFAULT);
+    if (totalTimerRef.current) {
+      clearInterval(totalTimerRef.current);
+      totalTimerRef.current = null;
     }
+  }
+
 
     setPerLeft(null); // ★変更: 各問タイマーを使わない明示
     // if (perTimerRef.current) clearInterval(perTimerRef.current); // ★変更: 廃止
