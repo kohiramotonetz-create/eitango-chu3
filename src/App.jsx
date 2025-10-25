@@ -4,8 +4,8 @@ import wordsCsv from "./data/words.csv?raw"; // A:No / B:英単語 / C:日本語
 // ========= 設定 =========
 const QUESTION_COUNT = 20;
 const TOTAL_TIME_SEC_DEFAULT = 300; // 全体5分
-const PER_Q_TIME_SEC_DEFAULT = 20;  // 各問15〜30秒の中庸（※今回は使わないが残しておく）
-const USE_TOTAL_TIMER = true;       // 既定：全体タイマー優先
+const PER_Q_TIME_SEC_DEFAULT = 20;  // 各問15〜30秒（未使用だが残置）
+const USE_TOTAL_TIMER = true;       // 全体タイマーを使う
 const SKIP_HEADER = false;          // CSV先頭行にヘッダーがある場合のみ true
 
 // 難易度のUI選択肢
@@ -95,7 +95,7 @@ function sampleUnique(arr, k) {
 
 // ========= メインコンポーネント =========
 export default function App() {
-  // 送信UI用の状態（結果画面で使うが、宣言はトップで）
+  // 送信UI
   const [sending, setSending] = useState(false);
   const [progress, setProgress] = useState(0);
   const [sent, setSent] = useState(false);
@@ -110,14 +110,13 @@ export default function App() {
   const [step, setStep] = useState("start");  // start | quiz | result
   const [qIndex, setQIndex] = useState(0);
 
-  // 入力欄の値
+  // 入力欄
   const [value, setValue] = useState("");
 
-  // timers
+  // タイマー
   const [totalLeft, setTotalLeft] = useState(TOTAL_TIME_SEC_DEFAULT);
-  const [perLeft, setPerLeft] = useState(null);            // ★変更: 各問タイマー廃止 → null 運用
+  const [perLeft, setPerLeft] = useState(null); // 各問タイマー未使用
   const totalTimerRef = useRef(null);
-  // const perTimerRef = useRef(null);                     // ★変更: 各問タイマー廃止のため未使用
 
   // CSV読み込み
   useEffect(() => {
@@ -126,7 +125,7 @@ export default function App() {
 
     // CSV: [No, 英単語, 日本語, 難易度]
     const mapped = rows
-      .filter(r => r.length >= 4 && r[1] && r[2] && r[3]) // 空行/不完全行スキップ
+      .filter(r => r.length >= 4 && r[1] && r[2] && r[3])
       .map(r => ({
         no: String(r[0] ?? "").trim(),
         en: String(r[1] ?? "").trim(),
@@ -137,93 +136,68 @@ export default function App() {
     setAllItems(mapped);
   }, []);
 
-  // 難易度フィルタ適用
+  // 難易度フィルタ
   const filteredPool = useMemo(() => {
     const allow = normalizeDifficultyFilter(diffChoice);
     return allItems.filter(it => allow.has(it.level));
   }, [allItems, diffChoice]);
 
-  // 開始可能条件
+  // 開始可否
   const canStart = useMemo(
     () => filteredPool.length >= 1 && name.trim().length > 0,
     [filteredPool.length, name]
   );
 
-  // qIndex 変更時/quiz開始時に入力欄をリセット
+  // qIndex 変更時/quiz開始時に入力欄リセット
   useEffect(() => {
     if (step === "quiz") setValue("");
   }, [qIndex, step]);
-// ★追加：レビュー中は停止、再開時に自動でintervalを張り直す
-　useEffect(() => {
-  　if (!USE_TOTAL_TIMER) return;
 
-  　// 一時停止中はintervalを止める
-  　if (isPaused) {
-    　if (totalTimerRef.current) {
-      　clearInterval(totalTimerRef.current);
-      　totalTimerRef.current = null;
-    　}
-    　return;
-  　}
+  // レビュー表示（提出直後に「問題/自分の解答/模範解答」を出す）
+  const [showReview, setShowReview] = useState({ visible: false, record: null });
 
-  　// 動作中で、interval未設定なら開始
-  　if (!totalTimerRef.current) {
-    　totalTimerRef.current = setInterval(() => {
-      　setTotalLeft((t) => {
-        　if (t <= 1) {
-          　if (totalTimerRef.current) {
-            　clearInterval(totalTimerRef.current);
-            　totalTimerRef.current = null;
-          　}
-          　finishQuiz(); // 0秒で結果へ
-          　return 0;
-        　}
-        　return t - 1;
-      　});
-    　}, 1000);
-  　}
+  // ★レビュー中 or quiz以外は一時停止（必ずこの1回だけ定義）
+  const isPaused = useMemo(
+    () => (step !== "quiz") || showReview.visible,
+    [step, showReview.visible]
+  );
 
-  // ここでは特にクリーンアップ不要（停止は isPaused 側で実施）
-}, [isPaused, USE_TOTAL_TIMER]);
+  // ★タイマー管理（レビュー中は停止、再開時に interval を張り直す）※この useEffect は1つだけ
+  useEffect(() => {
+    if (!USE_TOTAL_TIMER) return;
 
-// ★追加：レビュー中は停止、再開時に interval を張り直す
-useEffect(() => {
-  if (!USE_TOTAL_TIMER) return;
-
-  // 停止状態なら interval を確実に止める
-  if (isPaused) {
-    if (totalTimerRef.current) {
-      clearInterval(totalTimerRef.current);
-      totalTimerRef.current = null;
+    // 停止状態なら interval を確実に止める
+    if (isPaused) {
+      if (totalTimerRef.current) {
+        clearInterval(totalTimerRef.current);
+        totalTimerRef.current = null;
+      }
+      return;
     }
-    return;
-  }
 
-  // 動作状態かつ interval 未設定なら開始
-  if (!totalTimerRef.current) {
-    totalTimerRef.current = setInterval(() => {
-      setTotalLeft((t) => {
-        if (t <= 1) {
-          if (totalTimerRef.current) {
-            clearInterval(totalTimerRef.current);
-            totalTimerRef.current = null;
+    // 動作状態かつ interval 未設定なら開始
+    if (!totalTimerRef.current) {
+      totalTimerRef.current = setInterval(() => {
+        setTotalLeft((t) => {
+          if (t <= 1) {
+            if (totalTimerRef.current) {
+              clearInterval(totalTimerRef.current);
+              totalTimerRef.current = null;
+            }
+            finishQuiz(); // 0秒で結果へ
+            return 0;
           }
-          finishQuiz(); // 0秒で終了へ
-          return 0;
-        }
-        return t - 1;
-      });
-    }, 1000);
-  }
-  // cleanup は isPaused 側で実施
-}, [isPaused, USE_TOTAL_TIMER, finishQuiz, setTotalLeft]);
-
+          return t - 1;
+        });
+      }, 1000);
+    }
+    // cleanup は isPaused 側で実施（ここでは何もしない）
+  }, [isPaused]); // ← 依存は isPaused のみでOK
 
   // アンマウント時にタイマー停止
   useEffect(() => {
     return () => {
       if (totalTimerRef.current) clearInterval(totalTimerRef.current);
-      // if (perTimerRef.current) clearInterval(perTimerRef.current); // ★変更: 各問タイマー廃止
     };
   }, []);
 
@@ -237,25 +211,19 @@ useEffect(() => {
     setQIndex(0);
     setStep("quiz");
 
-    // timers init（全体のみ）
-      if (USE_TOTAL_TIMER) {
-  // ★変更：残り時間だけ初期化。interval 開始/停止は useEffect に任せる
-  setTotalLeft(TOTAL_TIME_SEC_DEFAULT);
-  if (totalTimerRef.current) {
-    clearInterval(totalTimerRef.current);
-    totalTimerRef.current = null;
-  }
-}
+    // 全体タイマーは初期化のみ（intervalの開始/停止は useEffect に任せる）
+    if (USE_TOTAL_TIMER) {
+      setTotalLeft(TOTAL_TIME_SEC_DEFAULT);
+      if (totalTimerRef.current) {
+        clearInterval(totalTimerRef.current);
+        totalTimerRef.current = null;
+      }
+    }
 
-
-
-    setPerLeft(null); // ★変更: 各問タイマーを使わない明示
-    // if (perTimerRef.current) clearInterval(perTimerRef.current); // ★変更: 廃止
-    // perTimerRef.current = ...（削除）
+    setPerLeft(null); // 各問タイマー未使用
   }
 
   function submitAnswer(userInput) {
-    // ★安全化: items[qIndex] がなければ何もしない
     const item = items[qIndex];
     if (!item) return;
 
@@ -277,58 +245,44 @@ useEffect(() => {
       return;
     }
     setQIndex(qIndex + 1);
-    // setPerLeft(PER_Q_TIME_SEC_DEFAULT); // ★変更: 各問タイマー廃止
   }
 
   function finishQuiz() {
-    // if (perTimerRef.current) clearInterval(perTimerRef.current); // ★変更: 廃止
     if (totalTimerRef.current) clearInterval(totalTimerRef.current);
     setStep("result");
   }
 
-// レビュー表示（提出直後に「問題/自分の解答/模範解答」を出す）
-const [showReview, setShowReview] = useState({ visible: false, record: null });
+  // 送信（x-www-form-urlencoded + no-cors）※重複定義は無し
+  async function sendResult() {
+    const url = import.meta.env.VITE_GAS_URL;
+    if (!url) throw new Error("VITE_GAS_URL is empty");
 
-// ★追加：レビュー中 or quiz以外は一時停止（依存を明示）
-const isPaused = React.useMemo(
-  () => (step !== "quiz") || showReview.visible,
-  [step, showReview.visible]
-);
+    const payload = {
+      timestamp: new Date().toISOString(),
+      user_name: name,
+      mode,
+      difficulty: diffChoice,
+      score: answers.filter((a) => a.ok).length,
+      duration_sec: USE_TOTAL_TIMER ? (TOTAL_TIME_SEC_DEFAULT - totalLeft) : null,
+      question_set_id: `auto-${Date.now()}`,
+      questions: items.map((it) => ({ en: it.en, jp: it.jp, level: it.level })),
+      answers,
+      device_info: navigator.userAgent,
+    };
 
+    const body = new URLSearchParams({ payload: JSON.stringify(payload) });
 
-  
-  // A案（古文式・成否はUIで即時判定しない）
-async function sendResult() {
-  const url = import.meta.env.VITE_GAS_URL;
-  if (!url) throw new Error("VITE_GAS_URL is empty");
-
-  const payload = {
-    timestamp: new Date().toISOString(),
-    user_name: name,
-    mode,
-    difficulty: diffChoice,
-    score: answers.filter((a) => a.ok).length,
-    duration_sec: USE_TOTAL_TIMER ? (TOTAL_TIME_SEC_DEFAULT - totalLeft) : null,
-    question_set_id: `auto-${Date.now()}`,
-    questions: items.map((it) => ({ en: it.en, jp: it.jp, level: it.level })),
-    answers,
-    device_info: navigator.userAgent,
-  };
-
-  const body = new URLSearchParams({ payload: JSON.stringify(payload) });
-
-  // 応答は読まない（CORS回避）。エラーは基本的に発火しません。
-  fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
-    },
-    body,
-    mode: "no-cors",
-    keepalive: true, // ページ遷移時の送信もできるだけ維持
-  });
-}
-
+    // 応答は読まない（CORS回避）
+    fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+      },
+      body,
+      mode: "no-cors",
+      keepalive: true,
+    });
+  }
 
   // ---- 画面描画 ----
   let content = null;
@@ -385,7 +339,6 @@ async function sendResult() {
   } else if (step === "quiz") {
     const it = items[qIndex];
 
-    // ★安全ガード: 稀に不整合があっても描画で落ちないように
     if (!it) {
       content = (
         <div style={wrapStyle}>
@@ -401,7 +354,7 @@ async function sendResult() {
           isJpToEn={isJpToEn}
           display={isJpToEn ? it.jp : it.en}
           totalLeft={USE_TOTAL_TIMER ? totalLeft : null}
-          perLeft={perLeft} // ★null のまま渡す → 下で表示しない
+          perLeft={perLeft} // null のまま渡す → 下で表示しない
           value={value}
           setValue={setValue}
           onSubmit={() => submitAnswer(value)}
@@ -431,7 +384,7 @@ async function sendResult() {
       }, 200);
 
       try {
-        await sendResult(); // sendResultはPromiseを返す
+        await sendResult();
       } catch (e) {
         console.error(e);
         alert("送信に失敗しました。VITE_GAS_URL と GAS の公開設定を確認してください。");
@@ -461,23 +414,22 @@ async function sendResult() {
           得点：{score} / {answers.length}
         </div>
 
-        {/* 結果一覧（中央寄せ・背景統一） */}
-       <div
-        style={{
-          maxHeight: 300,
-          overflow: "auto",
-          width: "100%",
-          border: "1px solid #ddd",
-          borderRadius: 12,
-          padding: 12,
-          background: "#fafafa",
-          textAlign: "left",
-          color: "#111",
-          marginInline: "auto",
-          boxSizing: "border-box"
-        }}
->
-
+        {/* 結果一覧 */}
+        <div
+          style={{
+            maxHeight: 300,
+            overflow: "auto",
+            width: "100%",
+            border: "1px solid #ddd",
+            borderRadius: 12,
+            padding: 12,
+            background: "#fafafa",
+            textAlign: "left",
+            color: "#111",
+            marginInline: "auto",
+            boxSizing: "border-box"
+          }}
+        >
           {answers.map((r, i) => (
             <div
               key={i}
@@ -498,7 +450,7 @@ async function sendResult() {
           ))}
         </div>
 
-        {/* 送信ボタン・進捗・完了表示 */}
+        {/* 送信ボタンなど */}
         {!sent && !sending && (
           <button style={primaryBtnStyle} onClick={handleSend}>
             結果を送信
@@ -586,7 +538,7 @@ function QuizFrame({
         <div>Q {index + 1} / {total}</div>
         <div style={{ display: "flex", gap: 12 }}>
           {totalLeft != null && <Timer label="全体" sec={totalLeft} />}
-          {perLeft != null && <Timer label="この問題" sec={perLeft} />}{/* ★変更: perLeft が null のときは非表示 */}
+          {perLeft != null && <Timer label="この問題" sec={perLeft} />}{/* perLeft が null のときは非表示 */}
         </div>
       </div>
 
@@ -631,7 +583,7 @@ function Timer({ label, sec }) {
   return <div style={{ fontFamily: "ui-monospace, monospace" }}>{label}:{mm}:{ss}</div>;
 }
 
-// ========= スタイル（中央寄せ＆見え方修正） =========
+// ========= スタイル =========
 const wrapStyle = {
   width: "min(680px, 92vw)",
   maxWidth: "100%",
@@ -649,7 +601,7 @@ const wrapStyle = {
   flex: "0 0 auto",
 };
 
-const labelStyle = { alignSelf: "center", fontSize: 14, marginTop: 8, color: "#fff" }; // ラベルはダーク背景上で白のまま
+const labelStyle = { alignSelf: "center", fontSize: 14, marginTop: 8, color: "#fff" };
 
 const inputStyle = {
   width: "100%",
