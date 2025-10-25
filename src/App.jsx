@@ -593,9 +593,9 @@ function QuizFrame({
     />
   </div>
 )}
-</div>   {/* ← 最外の wrapStyle の <div> を閉じる */}
-);        {/* ← return() の閉じ */}
-}         {/* ← function QuizFrame の閉じ */}
+</div>
+);
+}
 
 function ReviewCorrection({ isJpToEn, correct, onSuccess }) {
   const [val, setVal] = React.useState("");
