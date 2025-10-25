@@ -153,6 +153,38 @@ export default function App() {
   useEffect(() => {
     if (step === "quiz") setValue("");
   }, [qIndex, step]);
+// ★追加：レビュー中は停止、再開時に自動でintervalを張り直す
+　useEffect(() => {
+  　if (!USE_TOTAL_TIMER) return;
+
+  　// 一時停止中はintervalを止める
+  　if (isPaused) {
+    　if (totalTimerRef.current) {
+      　clearInterval(totalTimerRef.current);
+      　totalTimerRef.current = null;
+    　}
+    　return;
+  　}
+
+  　// 動作中で、interval未設定なら開始
+  　if (!totalTimerRef.current) {
+    　totalTimerRef.current = setInterval(() => {
+      　setTotalLeft((t) => {
+        　if (t <= 1) {
+          　if (totalTimerRef.current) {
+            　clearInterval(totalTimerRef.current);
+            　totalTimerRef.current = null;
+          　}
+          　finishQuiz(); // 0秒で結果へ
+          　return 0;
+        　}
+        　return t - 1;
+      　});
+    　}, 1000);
+  　}
+
+  // ここでは特にクリーンアップ不要（停止は isPaused 側で実施）
+}, [isPaused, USE_TOTAL_TIMER]);
 
   // アンマウント時にタイマー停止
   useEffect(() => {
@@ -227,6 +259,8 @@ export default function App() {
 
   // レビュー表示（提出直後に「問題/自分の解答/模範解答」を出す）
   const [showReview, setShowReview] = useState({ visible: false, record: null });
+  // ★追加：quiz中以外 or レビュー表示中は一時停止
+　const isPaused = (step !== "quiz") || showReview.visible;
 
   
   // ---- CORS対策済みの送信関数（awaitを使わない版）----
