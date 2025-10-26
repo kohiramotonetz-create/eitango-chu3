@@ -19,6 +19,7 @@ const DIFF_CHOICES = [
 
 // 出題形式
 const MODE_CHOICES = ["日本語→英単語", "英単語→日本語"];
+const APP_NAME = import.meta.env.VITE_APP_NAME;
 
 // ========= ユーティリティ =========
 function parseCsvRaw(csvText) {
@@ -258,6 +259,7 @@ export default function App() {
     if (!url) throw new Error("VITE_GAS_URL is empty");
 
     const payload = {
+      subject: APP_NAME, // ★追加：GAS側のタブ名に使う（= VITE_APP_NAME）
       timestamp: new Date().toISOString(),
       user_name: name,
       mode,
