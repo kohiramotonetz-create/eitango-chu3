@@ -73,17 +73,37 @@ function trimSpaces(s) {
   return String(s || "").replace(/\s+/g, " ").trim();
 }
 
+// ★★★ ここに追加（START） ★★★
+function normalizeWidth(s) {
+  // 全角/半角などの互換文字を正規化
+  return String(s || "").normalize("NFKC");
+}
+
+// 日本語比較用：幅を正規化→空白正規化→ひらがな化
+function normalizeJpForCompare(s) {
+  const z = normalizeWidth(s).replace(/\s+/g, " ").trim();
+  return toHiragana(z);
+}
+
+// 英単語比較用：幅を正規化→空白正規化（必要なら .toLowerCase() を追加）
+function normalizeEnForCompare(s) {
+  return normalizeWidth(s).replace(/\s+/g, " ").trim();
+}
+// ★★★ ここに追加（END） ★★★
+
+
 function judgeAnswer({ mode, user, item }) {
   if (mode === "日本語→英単語") {
-    // 完全一致（前後空白のみ無視）
-    return trimSpaces(user) === trimSpaces(item.en);
+    // 全角/半角の差を NFKC で吸収して比較
+    return normalizeEnForCompare(user) === normalizeEnForCompare(item.en);
   } else {
-    // 英単語→日本語：ひらがな・カタカナ同一視
-    const u = toHiragana(trimSpaces(user));
-    const ans = toHiragana(trimSpaces(item.jpKana || item.jp));
+    // 日本語側は NFKC → 空白正規化 → ひらがな化 で比較（半角カナ含む）
+    const u = normalizeJpForCompare(user);
+    const ans = normalizeJpForCompare(item.jpKana || item.jp);
     return u === ans;
   }
 }
+
 
 function sampleUnique(arr, k) {
   const a = [...arr];
@@ -607,18 +627,18 @@ function ReviewCorrection({ isJpToEn, correct, onSuccess }) {
   React.useEffect(() => { setVal(""); setOk(false); }, [correct]);
 
   function check() {
-    const normalize = (s) => trimSpaces(s);
-    let pass;
-    if (isJpToEn) {
-      // 日本語→英単語：英単語は完全一致（前後空白無視）
-      pass = normalize(val) === normalize(correct);
-    } else {
-      // 英単語→日本語：かな同一視（前後空白無視）
-      pass = toHiragana(normalize(val)) === toHiragana(normalize(correct));
-    }
-    setOk(pass);
-    if (pass) onSuccess(); // 正解したら即「次の問題へ」
+  let pass;
+  if (isJpToEn) {
+    // 全角/半角の差を無視して英単語を比較
+    pass = normalizeEnForCompare(val) === normalizeEnForCompare(correct);
+  } else {
+    // 日本語は NFKC → 空白正規化 → ひらがな化で比較（半角カナOK）
+    pass = normalizeJpForCompare(val) === normalizeJpForCompare(correct);
   }
+  setOk(pass);
+  if (pass) onSuccess(); // 正解したら即「次の問題へ」
+}
+
 
   return (
     <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
