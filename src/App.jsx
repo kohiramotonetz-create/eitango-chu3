@@ -97,12 +97,18 @@ function judgeAnswer({ mode, user, item }) {
     // 全角/半角の差を NFKC で吸収して比較
     return normalizeEnForCompare(user) === normalizeEnForCompare(item.en);
   } else {
-    // 日本語側は NFKC → 空白正規化 → ひらがな化 で比較（半角カナ含む）
+    // 日本語→英単語（回答が日本語）の場合：
+    // 日本語訳が複数あるときはどれか1つでも一致すればOK
     const u = normalizeJpForCompare(user);
-    const ans = normalizeJpForCompare(item.jpKana || item.jp);
-    return u === ans;
+    const answers = String(item.jpKana || item.jp)
+      .split(/[／\/,、・]/) // 区切り文字で分割（／ / , 、 ・ に対応）
+      .map(s => normalizeJpForCompare(s))
+      .filter(Boolean); // 空要素除外
+
+    return answers.some(ans => ans === u);
   }
 }
+
 
 
 function sampleUnique(arr, k) {
@@ -626,18 +632,28 @@ function ReviewCorrection({ isJpToEn, correct, onSuccess }) {
   // フォーム表示のたびにリセット
   React.useEffect(() => { setVal(""); setOk(false); }, [correct]);
 
+
   function check() {
   let pass;
+
   if (isJpToEn) {
     // 全角/半角の差を無視して英単語を比較
     pass = normalizeEnForCompare(val) === normalizeEnForCompare(correct);
   } else {
-    // 日本語は NFKC → 空白正規化 → ひらがな化で比較（半角カナOK）
-    pass = normalizeJpForCompare(val) === normalizeJpForCompare(correct);
+    // 日本語は複数訳対応
+    const u = normalizeJpForCompare(val);
+    const answers = String(correct)
+      .split(/[／\/,、・]/)
+      .map(s => normalizeJpForCompare(s))
+      .filter(Boolean);
+
+    pass = answers.some(ans => ans === u);
   }
+
   setOk(pass);
   if (pass) onSuccess(); // 正解したら即「次の問題へ」
 }
+
 
 
   return (
