@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import wordsCsv from "./data/words.csv?raw"; // A:No / B:英単語 / C:日本語 / D:難易度 を想定
+import studentsNumbersCsv from "./students.number.csv?raw"; // ★ 生徒番号CSV
 
 // ========= 設定 =========
 const QUESTION_COUNT = 20;
@@ -73,9 +74,8 @@ function trimSpaces(s) {
   return String(s || "").replace(/\s+/g, " ").trim();
 }
 
-// ★★★ ここに追加（START） ★★★
+// 全角/半角などの互換文字を正規化
 function normalizeWidth(s) {
-  // 全角/半角などの互換文字を正規化
   return String(s || "").normalize("NFKC");
 }
 
@@ -85,20 +85,22 @@ function normalizeJpForCompare(s) {
   return toHiragana(z);
 }
 
-// 英単語比較用：幅を正規化→空白正規化（必要なら .toLowerCase() を追加）
+// 英単語比較用：幅を正規化→空白正規化
 function normalizeEnForCompare(s) {
   return normalizeWidth(s).replace(/\s+/g, " ").trim();
 }
-// ★★★ ここに追加（END） ★★★
 
+// 文字列trim（認証用）
+function trim(s) {
+  return String(s || "").trim();
+}
 
 function judgeAnswer({ mode, user, item }) {
   if (mode === "日本語→英単語") {
     // 全角/半角の差を NFKC で吸収して比較
     return normalizeEnForCompare(user) === normalizeEnForCompare(item.en);
   } else {
-    // 日本語→英単語（回答が日本語）の場合：
-    // 日本語訳が複数あるときはどれか1つでも一致すればOK
+    // 英単語→日本語（回答が日本語）の場合：
     const u = normalizeJpForCompare(user);
     const answers = String(item.jpKana || item.jp)
       .split(/[／\/,、・]/) // 区切り文字で分割（／ / , 、 ・ に対応）
@@ -108,8 +110,6 @@ function judgeAnswer({ mode, user, item }) {
     return answers.some(ans => ans === u);
   }
 }
-
-
 
 function sampleUnique(arr, k) {
   const a = [...arr];
@@ -127,6 +127,14 @@ export default function App() {
   const [progress, setProgress] = useState(0);
   const [sent, setSent] = useState(false);
 
+  // ★ step に auth を追加
+  const [step, setStep] = useState("auth");  // auth | start | quiz | result
+
+  // ★ 認証関連 state
+  const [authIds, setAuthIds] = useState(new Set());
+  const [studentNumber, setStudentNumber] = useState("");
+  const [authLoaded, setAuthLoaded] = useState(false);
+
   // グローバル state
   const [name, setName] = useState("");
   const [mode, setMode] = useState(MODE_CHOICES[0]);
@@ -134,7 +142,6 @@ export default function App() {
   const [allItems, setAllItems] = useState([]);
   const [items, setItems] = useState([]);
   const [answers, setAnswers] = useState([]); // {qIndex, q, a, correct, ok}
-  const [step, setStep] = useState("start");  // start | quiz | result
   const [qIndex, setQIndex] = useState(0);
 
   // 入力欄
@@ -145,7 +152,27 @@ export default function App() {
   const [perLeft, setPerLeft] = useState(null); // 各問タイマー未使用
   const totalTimerRef = useRef(null);
 
-  // CSV読み込み
+  // レビュー表示
+  const [showReview, setShowReview] = useState({ visible: false, record: null });
+
+  // ------------------- 生徒番号CSV 読み込み -------------------
+  useEffect(() => {
+    try {
+      const rows = parseCsvRaw(studentsNumbersCsv);
+      // 2行目以降のB列（index=1）を有効IDに
+      const ids = new Set(
+        rows.slice(1).map(r => trim(r[1])).filter(Boolean)
+      );
+      setAuthIds(ids);
+    } catch (e) {
+      console.error("students.number.csv の読み込み失敗:", e);
+      setAuthIds(new Set());
+    } finally {
+      setAuthLoaded(true);
+    }
+  }, []);
+
+  // ------------------- 単語CSV 読み込み -------------------
   useEffect(() => {
     let rows = parseCsvRaw(wordsCsv);
     if (SKIP_HEADER && rows.length) rows = rows.slice(1);
@@ -180,20 +207,16 @@ export default function App() {
     if (step === "quiz") setValue("");
   }, [qIndex, step]);
 
-  // レビュー表示（提出直後に「問題/自分の解答/模範解答」を出す）
-  const [showReview, setShowReview] = useState({ visible: false, record: null });
-
-  // ★レビュー中 or quiz以外は一時停止（必ずこの1回だけ定義）
+  // ★レビュー中 or quiz以外は一時停止
   const isPaused = useMemo(
     () => (step !== "quiz") || showReview.visible,
     [step, showReview.visible]
   );
 
-  // ★タイマー管理（レビュー中は停止、再開時に interval を張り直す）※この useEffect は1つだけ
+  // ★タイマー管理
   useEffect(() => {
     if (!USE_TOTAL_TIMER) return;
 
-    // 停止状態なら interval を確実に止める
     if (isPaused) {
       if (totalTimerRef.current) {
         clearInterval(totalTimerRef.current);
@@ -202,7 +225,6 @@ export default function App() {
       return;
     }
 
-    // 動作状態かつ interval 未設定なら開始
     if (!totalTimerRef.current) {
       totalTimerRef.current = setInterval(() => {
         setTotalLeft((t) => {
@@ -218,8 +240,7 @@ export default function App() {
         });
       }, 1000);
     }
-    // cleanup は isPaused 側で実施（ここでは何もしない）
-  }, [isPaused]); // ← 依存は isPaused のみでOK
+  }, [isPaused]);
 
   // アンマウント時にタイマー停止
   useEffect(() => {
@@ -227,6 +248,17 @@ export default function App() {
       if (totalTimerRef.current) clearInterval(totalTimerRef.current);
     };
   }, []);
+
+  // ------------------- 認証処理 -------------------
+  function tryAuth() {
+    const id = trim(studentNumber);
+    if (!id) return;
+    if (authIds.has(id)) {
+      setStep("start");
+    } else {
+      alert("利用ライセンスがありません。");
+    }
+  }
 
   function startQuiz() {
     const quizSet = sampleUnique(
@@ -238,7 +270,6 @@ export default function App() {
     setQIndex(0);
     setStep("quiz");
 
-    // 全体タイマーは初期化のみ（intervalの開始/停止は useEffect に任せる）
     if (USE_TOTAL_TIMER) {
       setTotalLeft(TOTAL_TIME_SEC_DEFAULT);
       if (totalTimerRef.current) {
@@ -247,7 +278,7 @@ export default function App() {
       }
     }
 
-    setPerLeft(null); // 各問タイマー未使用
+    setPerLeft(null);
   }
 
   function submitAnswer(userInput) {
@@ -279,13 +310,12 @@ export default function App() {
     setStep("result");
   }
 
-  // 送信（x-www-form-urlencoded + no-cors）※重複定義は無し
   async function sendResult() {
     const url = import.meta.env.VITE_GAS_URL;
     if (!url) throw new Error("VITE_GAS_URL is empty");
 
     const payload = {
-      subject: APP_NAME, // ★追加：GAS側のタブ名に使う（= VITE_APP_NAME）
+      subject: APP_NAME,
       timestamp: new Date().toISOString(),
       user_name: name,
       mode,
@@ -300,7 +330,6 @@ export default function App() {
 
     const body = new URLSearchParams({ payload: JSON.stringify(payload) });
 
-    // 応答は読まない（CORS回避）
     fetch(url, {
       method: "POST",
       headers: {
@@ -315,7 +344,35 @@ export default function App() {
   // ---- 画面描画 ----
   let content = null;
 
-  if (step === "start") {
+  // ① 認証画面
+  if (step === "auth") {
+    content = (
+      <div style={wrapStyle}>
+        <h1 style={{ fontSize: 28, marginBottom: 8 }}>利用認証</h1>
+        <p style={{ opacity: 0.8, marginBottom: 16 }}>生徒番号を入力してください。</p>
+
+        {!authLoaded ? (
+          <div>読み込み中…</div>
+        ) : (
+          <>
+            <input
+              style={inputStyle}
+              placeholder="例：20230001"
+              value={studentNumber}
+              onChange={(e) => setStudentNumber(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && tryAuth()}
+            />
+            <button style={primaryBtnStyle} onClick={tryAuth}>
+              認証する
+            </button>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // ② スタート画面
+  else if (step === "start") {
     content = (
       <div style={wrapStyle}>
         <h1 style={{ fontSize: 28, marginBottom: 8 }}>中３英単語 OなしでOK</h1>
@@ -364,7 +421,10 @@ export default function App() {
         </button>
       </div>
     );
-  } else if (step === "quiz") {
+  }
+
+  // ③ 問題
+  else if (step === "quiz") {
     const it = items[qIndex];
 
     if (!it) {
@@ -382,7 +442,7 @@ export default function App() {
           isJpToEn={isJpToEn}
           display={isJpToEn ? it.jp : it.en}
           totalLeft={USE_TOTAL_TIMER ? totalLeft : null}
-          perLeft={perLeft} // null のまま渡す → 下で表示しない
+          perLeft={perLeft}
           value={value}
           setValue={setValue}
           onSubmit={() => submitAnswer(value)}
@@ -391,14 +451,16 @@ export default function App() {
         />
       );
     }
-  } else if (step === "result") {
+  }
+
+  // ④ 結果
+  else if (step === "result") {
     const score = answers.filter((a) => a.ok).length;
 
     async function handleSend() {
       setSending(true);
       setProgress(0);
 
-      // 0→100% のフェイク進捗（見た目用）
       const fake = setInterval(() => {
         setProgress((p) => {
           if (p >= 100) {
@@ -442,7 +504,6 @@ export default function App() {
           得点：{score} / {answers.length}
         </div>
 
-        {/* 結果一覧 */}
         <div
           style={{
             maxHeight: 300,
@@ -478,7 +539,6 @@ export default function App() {
           ))}
         </div>
 
-        {/* 送信ボタンなど */}
         {!sent && !sending && (
           <button style={primaryBtnStyle} onClick={handleSend}>
             結果を送信
@@ -521,8 +581,8 @@ export default function App() {
                 flexWrap: "wrap",
               }}
             >
-              <button style={primaryBtnStyle} onClick={() => setStep("start")}>
-                ホームへ戻る
+              <button style={primaryBtnStyle} onClick={() => setStep("auth")}>
+                もう一度（認証からやり直し）
               </button>
               {wrongOnly.length > 0 && (
                 <button style={primaryBtnStyle} onClick={handleRetryWrong}>
@@ -566,7 +626,7 @@ function QuizFrame({
         <div>Q {index + 1} / {total}</div>
         <div style={{ display: "flex", gap: 12 }}>
           {totalLeft != null && <Timer label="全体" sec={totalLeft} />}
-          {perLeft != null && <Timer label="この問題" sec={perLeft} />}{/* perLeft が null のときは非表示 */}
+          {perLeft != null && <Timer label="この問題" sec={perLeft} />}
         </div>
       </div>
 
@@ -586,75 +646,66 @@ function QuizFrame({
         placeholder={isJpToEn ? "example: run" : "例：はしる（カタカナでもOK）"}
       />
 
-      {/* 答え合わせボタン：レビュー中は無効化 */}
-<button
-  style={{ ...primaryBtnStyle, opacity: showReview.visible ? 0.6 : 1 }}
-  onClick={onSubmit}
-  disabled={showReview.visible}
->
-  答え合わせ
-</button>
+      <button
+        style={{ ...primaryBtnStyle, opacity: showReview.visible ? 0.6 : 1 }}
+        onClick={onSubmit}
+        disabled={showReview.visible}
+      >
+        答え合わせ
+      </button>
 
-{showReview.visible && (
-  <div style={reviewStyle}>
-    <div style={{ fontWeight: "bold", marginBottom: 8 }}>答え合わせ</div>
-    <div>問題：{showReview.record.q}</div>
-    <div>あなた：{showReview.record.a || "（無回答）"}</div>
-    <div>
-      模範解答：<b>{showReview.record.correct}</b>{" "}
-      {showReview.record.ok ? "✅ 正解" : "❌ 不正解"}
+      {showReview.visible && (
+        <div style={reviewStyle}>
+          <div style={{ fontWeight: "bold", marginBottom: 8 }}>答え合わせ</div>
+          <div>問題：{showReview.record.q}</div>
+          <div>あなた：{showReview.record.a || "（無回答）"}</div>
+          <div>
+            模範解答：<b>{showReview.record.correct}</b>{" "}
+            {showReview.record.ok ? "✅ 正解" : "❌ 不正解"}
+          </div>
+
+          {!showReview.record.ok && (
+            <ReviewCorrection
+              isJpToEn={isJpToEn}
+              correct={showReview.record.correct}
+              onSuccess={onCloseReview}
+            />
+          )}
+
+          <ReviewNextButton
+            enabled={true}
+            onClick={onCloseReview}
+          />
+        </div>
+      )}
     </div>
-
-    {/* 不正解の場合だけ、正解入力フォームを表示 */}
-    {!showReview.record.ok && (
-      <ReviewCorrection
-        isJpToEn={isJpToEn}
-        correct={showReview.record.correct}
-        onSuccess={onCloseReview}
-      />
-    )}
-
-    {/* Next は「最初から正解」か「修正で正解後」に押せる */}
-    <ReviewNextButton
-       enabled={true} // ✅ 不正解でも押せるように変更
-      onClick={onCloseReview}
-    />
-  </div>
-)}
-</div>
-);
+  );
 }
 
 function ReviewCorrection({ isJpToEn, correct, onSuccess }) {
   const [val, setVal] = React.useState("");
   const [ok, setOk] = React.useState(false);
 
-  // フォーム表示のたびにリセット
   React.useEffect(() => { setVal(""); setOk(false); }, [correct]);
 
-
   function check() {
-  let pass;
+    let pass;
 
-  if (isJpToEn) {
-    // 全角/半角の差を無視して英単語を比較
-    pass = normalizeEnForCompare(val) === normalizeEnForCompare(correct);
-  } else {
-    // 日本語は複数訳対応
-    const u = normalizeJpForCompare(val);
-    const answers = String(correct)
-      .split(/[／\/,、・]/)
-      .map(s => normalizeJpForCompare(s))
-      .filter(Boolean);
+    if (isJpToEn) {
+      pass = normalizeEnForCompare(val) === normalizeEnForCompare(correct);
+    } else {
+      const u = normalizeJpForCompare(val);
+      const answers = String(correct)
+        .split(/[／\/,、・]/)
+        .map(s => normalizeJpForCompare(s))
+        .filter(Boolean);
 
-    pass = answers.some(ans => ans === u);
+      pass = answers.some(ans => ans === u);
+    }
+
+    setOk(pass);
+    if (pass) onSuccess();
   }
-
-  setOk(pass);
-  if (pass) onSuccess(); // 正解したら即「次の問題へ」
-}
-
-
 
   return (
     <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
@@ -696,7 +747,6 @@ function ReviewNextButton({ enabled, onClick }) {
     </button>
   );
 }
-
 
 function Timer({ label, sec }) {
   const mm = String(Math.floor(sec / 60)).padStart(2, "0");
