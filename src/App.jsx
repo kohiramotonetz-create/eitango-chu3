@@ -134,6 +134,8 @@ export default function App() {
   const [authIds, setAuthIds] = useState(new Set());
   const [studentNumber, setStudentNumber] = useState("");
   const [authLoaded, setAuthLoaded] = useState(false);
+  // ★ 追加：生徒番号→名前のマップ
+  const [idNameMap, setIdNameMap] = useState({});
 
   // グローバル state
   const [name, setName] = useState("");
@@ -157,20 +159,34 @@ export default function App() {
 
   // ------------------- 生徒番号CSV 読み込み -------------------
   useEffect(() => {
-    try {
-      const rows = parseCsvRaw(studentsNumbersCsv);
-      // 2行目以降のB列（index=1）を有効IDに
-      const ids = new Set(
-        rows.slice(1).map(r => trim(r[1])).filter(Boolean)
-      );
-      setAuthIds(ids);
-    } catch (e) {
-      console.error("students.number.csv の読み込み失敗:", e);
-      setAuthIds(new Set());
-    } finally {
-      setAuthLoaded(true);
-    }
-  }, []);
+  try {
+    const rows = parseCsvRaw(studentsNumbersCsv);
+
+    const ids = new Set();
+    const map = {};
+
+    rows.slice(1).forEach(r => {
+      const id = trim(r[1]);   // B列：生徒番号
+      const nm = trim(r[2]);   // C列：名前
+      if (id) {
+        ids.add(id);
+        if (nm) {
+          map[id] = nm;        // ID→名前 の対応を保存
+        }
+      }
+    });
+
+    setAuthIds(ids);
+    setIdNameMap(map);
+  } catch (e) {
+    console.error("students.number.csv の読み込み失敗:", e);
+    setAuthIds(new Set());
+    setIdNameMap({});
+  } finally {
+    setAuthLoaded(true);
+  }
+}, []);
+
 
   // ------------------- 単語CSV 読み込み -------------------
   useEffect(() => {
@@ -251,14 +267,21 @@ export default function App() {
 
   // ------------------- 認証処理 -------------------
   function tryAuth() {
-    const id = trim(studentNumber);
-    if (!id) return;
-    if (authIds.has(id)) {
-      setStep("start");
-    } else {
-      alert("利用ライセンスがありません。");
+  const id = trim(studentNumber);
+  if (!id) return;
+
+  if (authIds.has(id)) {
+    // ★ 対応する名前があれば自動入力
+    const autoName = idNameMap[id];
+    if (autoName) {
+      setName(autoName);
     }
+    setStep("start");
+  } else {
+    alert("利用ライセンスがありません。");
   }
+}
+
 
   function startQuiz() {
     const quizSet = sampleUnique(
